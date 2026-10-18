@@ -1,0 +1,120 @@
+'use strict';
+
+// ── Grid geometry ────────────────────────────────────────
+export const CELL_SIZE   = 80;
+export const CELL_GAP    = 8;
+export const CELL_STRIDE = CELL_SIZE + CELL_GAP; // 88px per cell slot
+export const CTRL_SIZE   = 28; // row-controls width = col-controls height (fixed in CSS)
+export const BB_MARGIN   = 12; // equal visible margin on each side of grid cells (default)
+export const MIN_BB_SIZE = 40;
+
+// ── Limits ───────────────────────────────────────────────
+// MIN/MAX_GRID mirror the stepper buttons. They are also the clamp applied to
+// imported files: without them a hand-edited JSON can ask for a 5000×5000 grid,
+// which renders 25 million DOM nodes and hangs the tab.
+export const MIN_GRID       = 1;
+export const MAX_GRID       = 20;
+export const MAX_DESK_COUNT = 60;  // mirrors <input id="desk-count" max>
+export const MAX_DESKS      = 400; // hard ceiling for imported files
+export const MAX_UNDO       = 20;
+export const MIN_TEXT_SCALE = 0.5;
+export const MAX_TEXT_SCALE = 1.5;
+
+// ── Storage keys ─────────────────────────────────────────
+export const LS_MAP  = 'klassekart_'; // prefix for saved seating charts
+export const LS_LIST = 'kl_liste_';   // prefix for saved student lists
+export const LS_LAST = 'klassekart_last';
+
+// ── Paper ────────────────────────────────────────────────
+export const MM_TO_PX        = 96 / 25.4;
+export const PAGE_MARGIN_MM  = 10; // must match the @page margin in updatePrintPageStyle
+export const PAGE_SIZES_MM   = { A4: [210, 297], A3: [297, 420] }; // [short, long]
+
+// Height of #print-header plus its bottom margin, in print layout. Only
+// measurable while printing, so this is the fallback when we can't measure —
+// keep it in step with the #print-header rule in styles.css.
+export const PRINT_HEADER_PX = 61;
+
+// Never shrink a chart into illegibility; below this we let it overflow instead.
+export const MIN_PRINT_ZOOM  = 0.35;
+
+// Scaling to the exact printable width leaves no room for rounding, and
+// browsers and printer drivers disagree slightly about the usable area. A
+// couple of percent of slack is invisible but keeps a chart off page two.
+export const PRINT_FIT_SLACK = 0.98;
+
+// ── Rules ────────────────────────────────────────────────
+export const MAX_RULES   = 200;
+export const RULE_SYMBOL = { apart: '🚫', together: '🤝' };
+
+// ── Groups ───────────────────────────────────────────────
+export const MIN_GROUP_SIZE    = 2;
+export const MAX_GROUP_SIZE    = 15;
+export const MIN_GROUP_COUNT   = 2;
+export const MAX_GROUP_COUNT   = 30;
+export const MAX_GROUP_HISTORY = 5;  // earlier days «Unngå forrige grupper» remembers
+export const MAX_ROLES         = 12;
+export const MAX_ROLE_LENGTH   = 40;
+// Offered as one-click hints — never added unless the teacher picks them.
+export const ROLE_SUGGESTIONS  = [
+  'Ordstyrer', 'Sekretær', 'Tidtaker', 'Presentatør', 'Materialansvarlig', 'Djevelens advokat'
+];
+
+// ── Allowlists ───────────────────────────────────────────
+// Print format/orientation are interpolated into a <style> element, so they
+// must never carry arbitrary text from an imported file.
+export const VALID_PRINT_FORMATS      = new Set(['A4', 'A3']);
+export const VALID_PRINT_ORIENTATIONS = new Set(['landscape', 'portrait']);
+export const VALID_BB_POSITIONS       = new Set(['top', 'bottom', 'left', 'right']);
+export const VALID_GROUP_SIZES        = new Set([1, 2, 3, 4]);
+export const VALID_MODES              = new Set(['seating', 'groups', 'activities']);
+export const VALID_RULE_TYPES         = new Set(['apart', 'together']);
+export const VALID_GROUP_SIZE_MODES   = new Set(['size', 'count']);
+
+// ── Aktiviteter ──────────────────────────────────────────
+// Leker som gjenbruker elevlisten og reglene. Én aktivitet foreløpig, men
+// state og visning er bygget for at det kommer flere.
+export const VALID_ACTIVITIES  = new Set(['mariusleken']);
+export const VALID_GAME_PHASES = new Set(['setup', 'ready', 'play', 'score', 'done']);
+
+export const MIN_TEAM_SIZE   = 2;
+export const MAX_TEAM_SIZE   = 10;
+export const MAX_TEAMS       = 12;
+export const MAX_TEAM_NAME   = 30;
+export const MIN_CATEGORIES  = 2;
+export const MAX_CATEGORIES  = 8;
+export const MAX_CAT_LENGTH  = 30;
+export const MAX_ROUNDS      = 40;
+export const MAX_POINTS      = 2;  // per kategori: 0 = tomt/feil, 1 = flere hadde det, 2 = alene
+export const MAX_PENALTY     = 5;  // trekk per lag per runde (juks, bråk o.l.)
+export const SECONDS_CHOICES = [15, 20, 30, 45, 60];
+export const DEFAULT_SECONDS = 30;
+export const ROUNDS_ON_SHEET = 8;  // rader på det utskrevne svararket
+
+// Bokstaver det faktisk går an å finne ord på. C, Q, W, X, Y, Z og Æ ligger bak
+// «vanskelige bokstaver» — ellers står et helt lag fast i to minutter.
+export const EASY_LETTERS = [
+  'A', 'B', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L',
+  'M', 'N', 'O', 'P', 'R', 'S', 'T', 'U', 'V', 'Ø', 'Å'
+];
+export const HARD_LETTERS = ['C', 'Q', 'W', 'X', 'Y', 'Z', 'Æ'];
+
+// Trekkes som standardsett, men er ikke låst — læreren kan bytte ut én og én.
+export const CLASSIC_CATEGORIES = ['By', 'Land', 'Elv', 'Navn', 'Dyr'];
+
+// Alt som kan trekkes. Holdt til kategorier en 8.-klassing har noe å skrive på
+// for de fleste bokstaver.
+export const CATEGORY_BANK = [
+  'By', 'Land', 'Elv', 'Navn', 'Dyr', 'Hovedstad', 'Norsk kommune', 'Fjell', 'Innsjø',
+  'Hav eller fjord', 'Verdensdel', 'Sted i Norge', 'Sted i verden', 'Språk', 'Nasjonalitet',
+  'Yrke', 'Skolefag', 'Kjendis', 'Historisk person', 'Eventyrfigur', 'Superhelt',
+  'Mat', 'Frukt eller grønnsak', 'Drikke', 'Dessert', 'Krydder', 'Ting på kjøkkenet',
+  'Farge', 'Kroppsdel', 'Klesplagg', 'Møbel', 'Verktøy', 'Kjøretøy', 'Bilmerke',
+  'Sport eller idrett', 'Idrettsutøver', 'Musikkinstrument', 'Sang eller artist',
+  'Film', 'TV-serie', 'Bok eller forfatter', 'Dataspill', 'Brettspill eller leke',
+  'Nettsted eller app', 'Merkevare', 'Butikk eller kjede',
+  'Fugl', 'Fisk', 'Insekt', 'Kjæledyr', 'Blomst', 'Tre eller plante',
+  'Grunnstoff', 'Planet eller stjerne', 'Værfenomen', 'Oppfinnelse',
+  'Ting i klasserommet', 'Ting i sekken', 'Ting som lager lyd', 'Ting som er rundt',
+  'Adjektiv', 'Verb', 'Følelse', 'Høytid eller merkedag', 'Bursdagsgave', 'Organisasjon'
+];

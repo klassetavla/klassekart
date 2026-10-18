@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; font-src 'self'; form-action 'none'; base-uri 'self';">
+  <title>Klassetavla</title>
+  <!-- Inline favicon: avoids a 404 on every load without adding a file. -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🪑</text></svg>">
+  <link rel="stylesheet" href="styles.css?v=27">
+</head>
+<body class="mode-seating">
+
+  <!-- Custom context menu (right-click on desk) -->
+  <div id="context-menu" role="menu" aria-label="Pultvalg">
+    <div class="ctx-item" id="ctx-lock" role="menuitem" tabindex="-1">🔒 Lås pult</div>
+    <div class="ctx-item" id="ctx-edit" role="menuitem" tabindex="-1">✏️ Rediger navn</div>
+    <div class="ctx-item" id="ctx-size" role="menuitem" tabindex="-1">↔️ Gjør bred</div>
+    <div class="ctx-sep" role="separator"></div>
+    <div class="ctx-item" id="ctx-mark" role="menuitem" tabindex="-1">📦 Merk som tom pult</div>
+    <div class="ctx-item ctx-danger" id="ctx-remove-student" role="menuitem" tabindex="-1">🗑️ Fjern elev</div>
+    <div class="ctx-item ctx-danger" id="ctx-remove-teacher" role="menuitem" tabindex="-1">🗑️ Fjern lærerpult</div>
+  </div>
+
+  <!-- ── Venstre sidebar: Elev ─────────────────────────── -->
+  <aside id="sidebar-left">
+    <div id="sidebar-header">
+      <h1>Klassetavla</h1>
+      <button id="btn-new-class" class="btn-new-class" title="Start ny klasse">Ny klasse</button>
+    </div>
+
+    <!-- Klassenavn -->
+    <div class="section">
+      <label class="section-label" for="class-name">Klassenavn</label>
+      <input type="text" id="class-name" placeholder="f.eks. 7A">
+    </div>
+
+    <!-- Handlinger -->
+    <div class="section">
+      <button id="btn-randomize" class="btn-primary">🔀 Randomiser</button>
+      <button id="btn-undo" class="btn-secondary mt-6">↩ Angre</button>
+    </div>
+
+    <!-- Elever -->
+    <div class="section">
+      <label class="section-label">Elever <span id="student-count">(0)</span></label>
+      <textarea id="students-textarea"
+        placeholder="Skriv ett navn per linje&#10;&#10;Ola Nordmann&#10;Kari Hansen&#10;..."></textarea>
+      <div id="dup-warning" class="dup-warning"></div>
+      <button id="btn-paste-students" class="btn-secondary mt-6">📋 Lim inn fra Excel/Sheets</button>
+      <details class="details-lists">
+        <summary class="details-summary">Lagrede lister</summary>
+        <div class="sub-row mt-6">
+          <input type="text" id="list-name-input" class="input-sm" placeholder="Listenavn...">
+          <button id="btn-save-list" class="btn-sm">Lagre</button>
+        </div>
+        <div class="sub-row mt-4">
+          <select id="saved-lists" class="select-sm">
+            <option value="">— Velg elevliste —</option>
+          </select>
+          <button id="btn-load-list" class="btn-sm">Last</button>
+          <button id="btn-delete-list" class="btn-sm btn-sm-danger">✕</button>
+        </div>
+      </details>
+    </div>
+
+    <!-- Mismatch-varsel. Wrapped: renderMismatchWarning() overwrites className. -->
+    <div class="seating-only">
+      <div id="mismatch-warning"></div>
+      <div id="overflow-list"></div>
+    </div>
+
+    <!-- Regler — delt mellom klassekart og grupper. Lukket som standard, så
+         skjermen kan vises for klassen uten at reglene synes. -->
+    <div class="section">
+      <details class="details-rules">
+        <summary class="details-summary">
+          Regler <span id="rule-count" class="rule-count"></span>
+          <span id="rule-alert" class="rule-alert" hidden>⚠</span>
+          <button type="button" id="rules-info" class="info-btn info-btn-sm" aria-expanded="false" aria-controls="rules-tip"
+            title="Regler bestemmer hvem som skal eller ikke skal havne sammen. Klikk for mer.">?</button>
+        </summary>
+        <div class="details-body">
+          <datalist id="students-datalist"></datalist>
+          <div class="sub-row">
+            <input type="text" id="rule-a" list="students-datalist" class="input-sm" placeholder="Elev A" aria-label="Elev A">
+            <span class="rule-og">og</span>
+            <input type="text" id="rule-b" list="students-datalist" class="input-sm" placeholder="Elev B" aria-label="Elev B">
+          </div>
+          <div class="btn-row mt-4">
+            <button type="button" id="btn-add-apart" class="btn-secondary">🚫 Ikke sammen</button>
+            <button type="button" id="btn-add-together" class="btn-secondary">🤝 Sammen</button>
+          </div>
+          <p id="rule-hint" class="rule-hint"></p>
+          <ul id="rule-list"></ul>
+          <label id="rule-options" class="check-row" hidden>
+            <input type="checkbox" id="use-rules" checked>
+            <span id="use-rules-label">Bruk reglene ved randomisering</span>
+          </label>
+        </div>
+      </details>
+      <!-- Outside <details> so the explanation can be read while the rules stay hidden. -->
+      <p id="rules-tip" class="opt-tip" hidden>
+        Regler bestemmer hvilke elever som <strong>skal</strong> eller <strong>ikke skal</strong> havne sammen —
+        ved siden av hverandre i klassekartet, eller i samme gruppe. Trekningen følger reglene så langt det
+        lar seg gjøre, og du kan slå dem av uten å slette dem.<br><br>
+        Panelet er lukket som standard, så elevene ikke ser reglene når skjermen vises på tavla.
+      </p>
+    </div>
+  </aside>
+
+  <button class="sidebar-tab" id="tab-left" title="Vis/skjul elevpanel">‹</button>
+
+  <!-- ── Klasserom ──────────────────────────────────────── -->
+  <main id="classroom-wrapper">
+    <nav id="mode-tabs" aria-label="Verktøy">
+      <div class="mode-tablist" role="tablist" aria-label="Verktøy">
+        <button type="button" class="mode-tab active" role="tab" data-mode-tab="seating" aria-selected="true">🪑 Klassekart</button>
+        <button type="button" class="mode-tab" role="tab" data-mode-tab="groups" aria-selected="false">👥 Grupper</button>
+        <button type="button" class="mode-tab" role="tab" data-mode-tab="activities" aria-selected="false">🎲 Aktiviteter</button>
+      </div>
+      <!-- Egen nettside, ikke en modus: åpnes i ny fane så tavla blir stående. -->
+      <a class="mode-tab mode-link" href="https://naturfag.klassetavla.no" target="_blank" rel="noopener">🔬 Naturfag <span aria-hidden="true">↗</span><span class="sr-only"> (åpnes i ny fane)</span></a>
+    </nav>
+    <div id="print-header">
+      <strong id="ph-class"></strong>
+      <span id="ph-date"></span>
+    </div>
+
+    <!-- ── Grupper ─────────────────────────────────────── -->
+    <section id="groups-view" class="groups-only" aria-label="Grupper">
+      <div id="groups-toolbar" hidden>
+        <div id="groups-summary"></div>
+        <div class="groups-actions">
+          <button type="button" id="btn-reroll-roles" class="btn-tool" hidden>🎭 Nye roller</button>
+          <button type="button" id="btn-copy-groups" class="btn-tool">📋 Kopier</button>
+          <button type="button" id="btn-print-groups" class="btn-tool" title="Skriv ut (eller trykk Ctrl+P)">🖨️ Skriv ut</button>
+          <button type="button" id="btn-board" class="btn-tool btn-tool-dark">📺 Tavlemodus</button>
+        </div>
+      </div>
+      <div id="groups-notice"></div>
+      <div id="groups-empty" class="groups-empty">
+        <div class="groups-empty-icon" aria-hidden="true">👥</div>
+        <h2>Del klassen i grupper</h2>
+        <p id="groups-empty-text"></p>
+        <button type="button" id="btn-draw-empty" class="btn-primary btn-draw-big">🎲 Trekk grupper</button>
+        <button type="button" id="btn-board-empty" class="link-btn">…eller trekk dem rett på tavla 📺</button>
+      </div>
+      <div id="groups-grid"></div>
+    </section>
+
+    <!-- ── Aktiviteter ─────────────────────────────────── -->
+    <section id="activities-view" class="activities-only" aria-label="Aktiviteter">
+
+      <div id="act-picker">
+        <h2 class="act-title">Aktiviteter</h2>
+        <p class="act-intro">
+          Leker som bruker elevlisten og reglene dine. Spillet åpnes i fullskjerm, klart for projektoren.
+        </p>
+        <div id="act-cards" class="act-cards">
+          <button type="button" class="act-card" data-act-open="mariusleken">
+            <span class="act-card-icon" aria-hidden="true">🅰️</span>
+            <span class="act-card-title">Mariusleken</span>
+            <span class="act-card-sub">By, land, elv — lag, bokstav, timer og poeng på tavla</span>
+          </button>
+          <div class="act-card act-card-soon">
+            <span class="act-card-icon" aria-hidden="true">➕</span>
+            <span class="act-card-title">Flere kommer</span>
+            <span class="act-card-sub">Det er plass til flere leker her.</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="act-setup" hidden>
+        <header id="act-setup-head">
+          <button type="button" id="act-back" class="link-btn">‹ Alle aktiviteter</button>
+          <h2 class="act-title">Mariusleken</h2>
+          <p id="act-setup-sub" class="act-intro"></p>
+        </header>
+
+        <section class="act-panel">
+          <div class="act-panel-head">
+            <h3>Kategorier <span id="act-cat-count" class="act-muted"></span></h3>
+            <div class="act-panel-actions">
+              <button type="button" id="act-cat-reroll" class="btn-tool">🎲 Trekk nye</button>
+              <button type="button" id="act-cat-classic" class="btn-tool">Klassisk sett</button>
+            </div>
+          </div>
+          <ul id="act-cat-list" class="act-cats"></ul>
+          <div class="sub-row mt-6">
+            <input type="text" id="act-cat-input" class="input-sm" maxlength="30"
+              placeholder="Skriv inn en egen kategori …" aria-label="Ny kategori">
+            <button type="button" id="act-cat-add" class="btn-sm">+</button>
+          </div>
+          <p id="act-cat-hint" class="act-hint"></p>
+        </section>
+
+        <section class="act-panel">
+          <div class="act-panel-head">
+            <h3>Lag <span id="act-team-count" class="act-muted"></span></h3>
+            <div class="act-panel-actions">
+              <button type="button" id="act-teams-draw" class="btn-tool">🎲 Trekk lag</button>
+              <button type="button" id="act-teams-import" class="btn-tool">👥 Hent fra Grupper</button>
+            </div>
+          </div>
+          <div id="act-teams" class="act-teams"></div>
+          <p id="act-team-hint" class="act-hint"></p>
+        </section>
+
+        <div id="act-start-row">
+          <button type="button" id="act-start" class="btn-primary btn-draw-big">▶ Start Mariusleken</button>
+          <button type="button" id="act-reset" class="link-btn" hidden>Nullstill spillet</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bygges bare når svararkene skrives ut; skjult på skjermen. -->
+    <div id="answer-sheets" aria-hidden="true"></div>
+
+    <div id="stats-banner" class="stats-banner seating-only"></div>
+    <div id="classroom" class="seating-only">
+      <div id="blackboard">
+        <span id="blackboard-label">TAVLE</span>
+        <span id="classroom-title"></span>
+      </div>
+      <div id="grid-area">
+        <div id="col-controls"></div>
+        <div id="grid-row-wrap">
+          <div id="row-controls"></div>
+          <div id="grid-container"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <button class="sidebar-tab" id="tab-right" title="Vis/skjul kartpanel">›</button>
+
+  <!-- ── Høyre sidebar: Kart ───────────────────────────── -->
+  <aside id="sidebar-right">
+
+    <!-- Gruppeinndeling -->
+    <div class="section groups-only">
+      <label class="section-label">Inndeling</label>
+      <div class="seg" role="group" aria-label="Del inn etter">
+        <button type="button" class="seg-btn" data-grp-sizemode="size">Per gruppe</button>
+        <button type="button" class="seg-btn" data-grp-sizemode="count">Antall grupper</button>
+      </div>
+      <div class="input-row mt-8">
+        <span class="input-label" id="grp-stepper-label">Elever per gruppe</span>
+        <div class="stepper">
+          <button type="button" class="stepper-btn" id="grp-dec" aria-label="Færre">−</button>
+          <span class="stepper-val" id="grp-val">4</span>
+          <button type="button" class="stepper-btn" id="grp-inc" aria-label="Flere">+</button>
+        </div>
+      </div>
+      <p class="grp-preview" id="grp-preview"></p>
+    </div>
+
+    <!-- Tillegg — alle av som standard -->
+    <div class="section groups-only">
+      <label class="section-label">Tillegg</label>
+
+      <div class="opt">
+        <div class="opt-row">
+          <label class="opt-label" for="grp-absent-toggle">Noen er borte i dag</label>
+          <input type="checkbox" id="grp-absent-toggle" class="switch">
+        </div>
+        <div class="opt-body" id="grp-absent-body" hidden>
+          <p class="opt-hint">Klikk på dem som er borte. Nullstilles av seg selv i morgen. <span id="grp-absent-count"></span></p>
+          <div class="chips" id="grp-absent-chips"></div>
+        </div>
+      </div>
+
+      <div class="opt">
+        <div class="opt-row">
+          <label class="opt-label" for="grp-repeat-toggle">Unngå forrige grupper</label>
+          <button type="button" class="info-btn" id="grp-repeat-info" aria-expanded="false" aria-controls="grp-repeat-tip" title="Hva betyr dette?">?</button>
+          <input type="checkbox" id="grp-repeat-toggle" class="switch">
+        </div>
+        <p class="opt-tip" id="grp-repeat-tip" hidden>
+          Prøver å sette sammen elever som ikke har vært på gruppe sammen de siste gangene.
+          Den siste trekningen fra hver dag huskes, opptil fem dager tilbake. Reglene går alltid foran.
+        </p>
+        <div class="opt-body" id="grp-repeat-body" hidden>
+          <p class="opt-hint"><span id="grp-history-count"></span> <button type="button" class="link-btn" id="btn-forget-history">Glem</button></p>
+        </div>
+      </div>
+
+      <div class="opt">
+        <div class="opt-row">
+          <label class="opt-label" for="grp-roles-toggle">Tildel roller</label>
+          <input type="checkbox" id="grp-roles-toggle" class="switch">
+        </div>
+        <div class="opt-body" id="grp-roles-body" hidden>
+          <div class="sub-row">
+            <input type="text" id="grp-role-input" class="input-sm" placeholder="Skriv en rolle …" maxlength="40" aria-label="Ny rolle">
+            <button type="button" id="btn-add-role" class="btn-sm">+</button>
+          </div>
+          <ol id="grp-role-list" class="role-list"></ol>
+          <p class="opt-hint" id="grp-role-hint"></p>
+          <div id="grp-role-suggest-wrap" class="role-suggest">
+            <span class="opt-hint">Forslag:</span>
+            <div class="chips" id="grp-role-suggestions"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aktiviteter -->
+    <div class="section activities-only">
+      <label class="section-label">Lag</label>
+      <div class="input-row">
+        <span class="input-label">Elever per lag</span>
+        <div class="stepper">
+          <button type="button" class="stepper-btn" id="act-size-dec" aria-label="Færre">−</button>
+          <span class="stepper-val" id="act-size-val">4</span>
+          <button type="button" class="stepper-btn" id="act-size-inc" aria-label="Flere">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section activities-only">
+      <label class="section-label">Spillet</label>
+      <div class="input-row">
+        <span class="input-label">Antall kategorier</span>
+        <div class="stepper">
+          <button type="button" class="stepper-btn" id="act-cat-dec" aria-label="Færre">−</button>
+          <span class="stepper-val" id="act-cat-num">5</span>
+          <button type="button" class="stepper-btn" id="act-cat-inc" aria-label="Flere">+</button>
+        </div>
+      </div>
+      <div class="input-row">
+        <span class="input-label">Tid per kategori</span>
+        <select id="act-seconds" class="select-sm">
+          <option value="15">15 sek</option>
+          <option value="20">20 sek</option>
+          <option value="30" selected>30 sek</option>
+          <option value="45">45 sek</option>
+          <option value="60">60 sek</option>
+        </select>
+      </div>
+      <p class="opt-hint">Én runde varer <span id="act-round-time">2:30</span>.</p>
+
+      <div class="opt">
+        <div class="opt-row">
+          <label class="opt-label" for="act-sound">Lyd</label>
+          <input type="checkbox" id="act-sound" class="switch" checked>
+        </div>
+      </div>
+
+      <div class="opt" id="act-music-row">
+        <div class="opt-row">
+          <label class="opt-label" for="act-music">Ventemusikk</label>
+          <input type="checkbox" id="act-music" class="switch" checked>
+        </div>
+        <p class="opt-hint">Spilles mens timeren går, og øker tempoet de siste 10 sekundene.</p>
+      </div>
+
+      <div class="opt">
+        <div class="opt-row">
+          <label class="opt-label" for="act-hard">Vanskelige bokstaver</label>
+          <button type="button" class="info-btn" id="act-hard-info" aria-expanded="false"
+            aria-controls="act-hard-tip" title="Hva betyr dette?">?</button>
+          <input type="checkbox" id="act-hard" class="switch">
+        </div>
+        <p class="opt-tip" id="act-hard-tip" hidden>
+          Tar C, Q, W, X, Y, Z og Æ med i bokstavtrekningen. Av som standard — ellers
+          kan et helt lag bli sittende fast i to minutter.
+        </p>
+      </div>
+    </div>
+
+    <div class="section activities-only">
+      <label class="section-label">Svarark</label>
+      <p class="opt-hint">Tabell til utfylling for hånd — ett ark per lag, eller blanke ark om lagene ikke er trukket.</p>
+      <div class="input-row">
+        <label class="input-label" for="act-sheet-cats">Skriv kategoriene på arket</label>
+        <input type="checkbox" id="act-sheet-cats">
+      </div>
+      <button type="button" id="act-print-sheets" class="btn-primary mt-6">🖨️ Skriv ut svarark</button>
+    </div>
+
+    <!-- Oppsett -->
+    <div class="section seating-only">
+      <label class="section-label">Oppsett</label>
+      <div class="input-row">
+        <span class="input-label">Antall pulter</span>
+        <input type="number" id="desk-count" min="1" max="60" value="24">
+      </div>
+      <div class="input-row">
+        <span class="input-label">Gruppestørrelse</span>
+        <select id="group-size">
+          <option value="1">Enkeltpulter</option>
+          <option value="2" selected>2 og 2</option>
+          <option value="3">3 og 3</option>
+          <option value="4">4 og 4</option>
+        </select>
+      </div>
+      <div class="input-row">
+        <span class="input-label">Kolonner</span>
+        <div class="stepper">
+          <button class="stepper-btn" id="grid-cols-dec">−</button>
+          <span class="stepper-val" id="grid-cols-val">8</span>
+          <button class="stepper-btn" id="grid-cols-inc">+</button>
+        </div>
+      </div>
+      <div class="input-row">
+        <span class="input-label">Rader</span>
+        <div class="stepper">
+          <button class="stepper-btn" id="grid-rows-dec">−</button>
+          <span class="stepper-val" id="grid-rows-val">6</span>
+          <button class="stepper-btn" id="grid-rows-inc">+</button>
+        </div>
+      </div>
+      <div class="input-row">
+        <span class="input-label">Tavleposisjon</span>
+        <select id="blackboard-position">
+          <option value="top" selected>Øverst</option>
+          <option value="bottom">Nederst</option>
+          <option value="left">Venstre side</option>
+          <option value="right">Høyre side</option>
+        </select>
+      </div>
+      <div class="input-row">
+        <span class="input-label">Tekststørrelse</span>
+        <input type="range" id="text-scale" min="50" max="150" value="100" class="range-sm">
+        <span id="text-scale-val" class="text-scale-val">100%</span>
+      </div>
+      <button id="btn-teacher-desk" class="btn-secondary mt-6">Legg til lærerpult</button>
+    </div>
+
+    <!-- Lagrede kart -->
+    <div class="section seating-only">
+      <label class="section-label">Lagrede kart</label>
+      <select id="saved-maps"><option value="">— Velg lagret kart —</option></select>
+      <div class="btn-row mt-6">
+        <button id="btn-save" class="btn-secondary">Lagre</button>
+        <button id="btn-load" class="btn-secondary">Last inn</button>
+        <button id="btn-delete" class="btn-secondary btn-danger">Slett</button>
+      </div>
+    </div>
+
+    <!-- Utskrift og eksport -->
+    <div class="section seating-only">
+      <label class="section-label">Utskrift og eksport</label>
+      <button type="button" id="btn-print" class="btn-primary">🖨️ Skriv ut</button>
+      <p class="print-hint">Virker ikke knappen? Trykk <kbd>Ctrl+P</kbd></p>
+      <div class="sub-row mb-6">
+        <select id="print-format" class="select-sm">
+          <option value="A4">A4</option>
+          <option value="A3">A3</option>
+        </select>
+        <select id="print-orientation" class="select-sm">
+          <option value="landscape">Liggende</option>
+          <option value="portrait">Stående</option>
+        </select>
+      </div>
+      <div class="input-row">
+        <label class="input-label" for="hide-empty-desks">Skjul tomme pulter</label>
+        <input type="checkbox" id="hide-empty-desks">
+      </div>
+      <div class="input-row">
+        <label class="input-label" for="scale-to-fit" title="Krymper kartet så det får plass på ett ark">Tilpass til arket</label>
+        <input type="checkbox" id="scale-to-fit" checked>
+      </div>
+      <div class="btn-row">
+        <button id="btn-export" class="btn-secondary">JSON</button>
+        <button id="btn-export-png" class="btn-secondary">PNG</button>
+        <button id="btn-import" class="btn-secondary">Importer</button>
+      </div>
+      <input type="file" id="import-file" accept=".json" style="display:none">
+    </div>
+
+    <!-- Personvern / GDPR -->
+    <div class="section">
+      <label class="section-label">Personvern</label>
+      <p class="privacy-note">Elevdata lagres kun lokalt i din nettleser og sendes aldri til noen server.</p>
+      <button id="btn-clear-data" class="btn-secondary btn-danger mt-6">🗑️ Slett all lokal data</button>
+    </div>
+
+    <!-- The chart has the hint under its print button; groups print from the toolbar. -->
+    <div class="sidebar-footer groups-only">
+      Trykk <kbd>Ctrl+P</kbd> for å skrive ut
+    </div>
+  </aside>
+
+  <!-- ── Tavlemodus ───────────────────────────────────────── -->
+  <div id="board-view" role="dialog" aria-modal="true" aria-labelledby="bv-title" hidden>
+    <div class="bv-frame">
+      <header class="bv-head">
+        <h2 id="bv-title">Grupper</h2>
+        <div id="bv-deck" hidden>
+          <div class="bv-deck-stack" aria-hidden="true"><span></span><span></span><span></span></div>
+          <span id="bv-deck-count"></span>
+        </div>
+        <div class="bv-actions">
+          <button type="button" id="bv-skip" class="bv-btn" hidden>Hopp over ⏭</button>
+          <button type="button" id="bv-replay" class="bv-btn">✨ Del ut igjen</button>
+          <button type="button" id="bv-draw" class="bv-btn">🎲 Trekk på nytt</button>
+          <button type="button" id="bv-close" class="bv-btn" aria-label="Lukk tavlemodus">✕</button>
+        </div>
+      </header>
+      <div id="bv-grid"></div>
+      <div id="bv-empty">
+        <button type="button" id="bv-draw-empty" class="bv-btn bv-btn-big">🎲 Trekk grupper</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Spillskjerm (Aktiviteter) ────────────────────────── -->
+  <div id="game-view" role="dialog" aria-modal="true" aria-labelledby="gv-title" hidden>
+    <div class="gv-frame">
+      <header class="gv-head">
+        <h2 id="gv-title">Mariusleken</h2>
+        <span id="gv-round" class="gv-round"></span>
+        <div class="gv-actions">
+          <button type="button" id="gv-scores" class="gv-btn">📊 Stillingen</button>
+          <button type="button" id="gv-finish" class="gv-btn">🏆 Avslutt</button>
+          <button type="button" id="gv-close" class="gv-btn" aria-label="Lukk spillet">✕</button>
+        </div>
+      </header>
+      <div id="gv-body" class="gv-body"></div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+    integrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA=="></script>
+  <script type="module" src="src/main.js?v=26"></script>
+</body>
+</html>

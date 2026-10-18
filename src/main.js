@@ -1,0 +1,286 @@
+'use strict';
+
+import {
+  MAX_GRID, MAX_DESK_COUNT, MAX_DESKS, MIN_TEXT_SCALE, MAX_TEXT_SCALE, MAX_RULES
+} from './constants.js';
+import { state, pushUndo, getMoveMode, renameStudentRefs } from './state.js';
+import { computeAutoLayout } from './layout.js';
+import {
+  renderAll, renderClassroom, renderMismatchWarning, updateGridDisplay,
+  updatePrintPageStyle, updatePrintHeader, updateStudentCount, updateDatalist,
+  refreshDeskFontSizes, renderRuleList, syncDupWarning, deskFontSize,
+  updatePrintScale
+} from './render.js';
+import { rebuildDesks, toggleTeacherDesk, nudgeGrid, exitMoveMode } from './desks.js';
+import { randomizeSeating } from './randomize.js';
+import { initGroups, renderGroupsAll, drawGroupsNow } from './groups-view.js';
+import { initActivities, renderActivitiesAll, drawTeamsNow } from './activities-view.js';
+import { initDragAndDrop, initBlackboardResize } from './dnd.js';
+import {
+  saveToLocalStorage, loadFromLocalStorage, deleteFromLocalStorage, clearAllData,
+  saveList, loadList, deleteList, exportJSON, importJSON, exportPNG,
+  saveSession, restoreSession
+} from './storage.js';
+import { initUI, undo, newClass, pasteFromClipboard, hideContextMenu } from './ui.js';
+import { showToast, hideToast } from './toast.js';
+
+const $ = id => document.getElementById(id);
+
+// ── Randomize ────────────────────────────────────────────
+function handleRandomize() {
+  if (state.mode === 'groups') {
+    syncDupWarning();
+    drawGroupsNow();
+    return;
+  }
+  if (state.mode === 'activities') {
+    syncDupWarning();
+    drawTeamsNow();
+    return;
+  }
+  if (syncDupWarning().length > 0) {
+    showToast('Fjern duplikatnavn først');
+    return;
+  }
+  pushUndo();
+
+  // The first randomisation also picks a sensible grid; later ones respect
+  // whatever layout the teacher has arranged by hand.
+  if (!state.hasRandomized) {
+    const auto = computeAutoLayout(state.deskCount, state.groupSize);
+    state.gridCols = Math.min(MAX_GRID, auto.gridCols);
+    state.gridRows = Math.min(MAX_GRID, auto.gridRows);
+    updateGridDisplay();
+    rebuildDesks(false);
+    state.hasRandomized = true;
+  }
+
+  const { violations } = randomizeSeating();
+  renderClassroom();
+  renderMismatchWarning();
+
+  // No count: the screen may be on the projector. Which rules broke is shown
+  // in the (closed) rules panel.
+  showToast(violations > 0
+    ? 'Randomisert — ikke alle regler kunne oppfylles'
+    : 'Pulter randomisert!');
+}
+
+// ── Rules ────────────────────────────────────────────────
+function addRule(type) {
+  const a = $('rule-a').value.trim();
+  const b = $('rule-b').value.trim();
+  if (!a || !b) { showToast('Skriv inn to elevnavn'); return; }
+  if (a === b)  { showToast('Navnene må være forskjellige'); return; }
+
+  // One rule per pair: adding the opposite type changes the existing rule
+  // rather than leaving two contradicting ones behind.
+  const existing = state.rules.find(r => (r.a === a && r.b === b) || (r.a === b && r.b === a));
+  if (existing?.type === type) { showToast('Denne regelen finnes allerede'); return; }
+  if (!existing && state.rules.length >= MAX_RULES) { showToast(`Maks ${MAX_RULES} regler`); return; }
+
+  if (existing) existing.type = type;
+  else state.rules.push({ a, b, type });
+
+  $('rule-a').value = '';
+  $('rule-b').value = '';
+  $('rule-a').focus();
+  renderRuleList();
+  renderGroupsAll();
+  renderActivitiesAll();
+  showToast(existing
+    ? `Regelen er endret til «${type === 'together' ? 'sammen' : 'ikke sammen'}»`
+    : 'Regel lagt til');
+}
+
+// ── Student textarea ─────────────────────────────────────
+function handleStudentInput(e) {
+  const newNames = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+  syncDupWarning();
+
+  // If exactly one name was swapped for another, treat it as a rename and
+  // follow it to whichever desk the student is sitting at.
+  const removed = state.students.filter(n => !newNames.includes(n));
+  const added   = newNames.filter(n => !state.students.includes(n));
+  if (removed.length === 1 && added.length === 1) {
+    const [oldName, newName] = [removed[0], added[0]];
+    renameStudentRefs(oldName, newName);
+    state.desks.forEach(d => {
+      if (d.studentName !== oldName) return;
+      d.studentName = newName;
+      const el = $('desk-el-' + d.id);
+      if (el) {
+        el.textContent    = newName;
+        el.style.fontSize = deskFontSize(newName, d);
+      }
+    });
+  }
+
+  state.students = [...new Set(newNames)].slice(0, MAX_DESKS);
+  updateStudentCount();
+  updateDatalist();
+  renderMismatchWarning();
+  renderRuleList();
+  renderGroupsAll();
+  renderActivitiesAll();
+}
+
+// ── Event wiring ─────────────────────────────────────────
+function setupEventListeners() {
+  document.querySelectorAll('[data-mode-tab]').forEach(tab => {
+    tab.addEventListener('click', () => {
+      if (state.mode === tab.dataset.modeTab) return;
+      if (getMoveMode()) exitMoveMode();
+      hideContextMenu();
+      hideToast();
+      state.mode = tab.dataset.modeTab;
+      renderAll();
+    });
+  });
+
+  $('class-name').addEventListener('input', e => {
+    state.className = e.target.value;
+    $('classroom-title').textContent = state.className;
+    updatePrintHeader();
+  });
+
+  $('students-textarea').addEventListener('input', handleStudentInput);
+
+  $('desk-count').addEventListener('change', e => {
+    state.deskCount = Math.max(1, Math.min(MAX_DESK_COUNT, +e.target.value || 1));
+    e.target.value  = state.deskCount;
+    rebuildDesks(true);
+    renderAll();
+  });
+
+  $('group-size').addEventListener('change', e => {
+    state.groupSize = +e.target.value;
+    rebuildDesks(true);
+    renderAll();
+  });
+
+  $('grid-cols-dec').addEventListener('click', () => nudgeGrid('gridCols', -1));
+  $('grid-cols-inc').addEventListener('click', () => nudgeGrid('gridCols', +1));
+  $('grid-rows-dec').addEventListener('click', () => nudgeGrid('gridRows', -1));
+  $('grid-rows-inc').addEventListener('click', () => nudgeGrid('gridRows', +1));
+
+  $('blackboard-position').addEventListener('change', e => {
+    state.blackboardPosition = e.target.value;
+    state.blackboardInset    = null;
+    renderClassroom();
+  });
+
+  $('btn-teacher-desk').addEventListener('click', toggleTeacherDesk);
+  $('btn-randomize').addEventListener('click', handleRandomize);
+  $('btn-undo').addEventListener('click', undo);
+  $('btn-new-class').addEventListener('click', newClass);
+  $('btn-paste-students').addEventListener('click', pasteFromClipboard);
+
+  // Saved charts
+  $('btn-save').addEventListener('click', saveToLocalStorage);
+  $('btn-load').addEventListener('click', loadFromLocalStorage);
+  $('btn-delete').addEventListener('click', deleteFromLocalStorage);
+  $('btn-clear-data').addEventListener('click', clearAllData);
+
+  // Student lists
+  $('btn-save-list').addEventListener('click', saveList);
+  $('btn-load-list').addEventListener('click', loadList);
+  $('btn-delete-list').addEventListener('click', deleteList);
+
+  // Rules
+  $('rules-info').addEventListener('click', e => {
+    // The button sits inside <summary>; without this the click also opens the
+    // rules, which is exactly what must not happen in front of the class.
+    e.preventDefault();
+    const tip = $('rules-tip');
+    tip.hidden = !tip.hidden;
+    e.currentTarget.setAttribute('aria-expanded', String(!tip.hidden));
+  });
+  $('btn-add-apart').addEventListener('click', () => addRule('apart'));
+  $('btn-add-together').addEventListener('click', () => addRule('together'));
+  $('use-rules').addEventListener('change', e => {
+    const field = { groups: 'useRulesGroups', activities: 'useRulesActivities' }[state.mode]
+      || 'useRulesSeating';
+    state[field] = e.target.checked;
+    renderRuleList();
+    renderGroupsAll();
+  });
+
+  // Print / export / import
+  $('btn-print').addEventListener('click', () => window.print());
+  $('btn-export').addEventListener('click', exportJSON);
+  $('btn-export-png').addEventListener('click', exportPNG);
+  $('btn-import').addEventListener('click', () => $('import-file').click());
+  $('import-file').addEventListener('change', e => {
+    if (e.target.files.length > 0) {
+      importJSON(e.target.files[0]);
+      e.target.value = '';
+    }
+  });
+
+  // Text size — fires continuously while dragging, so only the font sizes are
+  // touched rather than rebuilding the whole grid on every tick.
+  $('text-scale').addEventListener('input', e => {
+    const pct = +e.target.value;
+    state.textScale = Math.min(MAX_TEXT_SCALE, Math.max(MIN_TEXT_SCALE, pct / 100));
+    $('text-scale-val').textContent = pct + '%';
+    refreshDeskFontSizes();
+  });
+
+  // Print settings
+  $('print-format').addEventListener('change', e => {
+    state.printFormat = e.target.value;
+    updatePrintPageStyle();
+  });
+  $('print-orientation').addEventListener('change', e => {
+    state.printOrientation = e.target.value;
+    updatePrintPageStyle();
+  });
+  $('hide-empty-desks').addEventListener('change', e => {
+    state.hideEmptyDesksOnPrint = e.target.checked;
+    updatePrintPageStyle();
+  });
+  $('scale-to-fit').addEventListener('change', e => {
+    state.scaleToFitOnPrint = e.target.checked;
+    updatePrintScale();
+  });
+
+  // Last chance to get the zoom right — by now the print layout is settled, so
+  // the header can be measured for real instead of falling back to a constant.
+  window.addEventListener('beforeprint', updatePrintScale);
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      if (getMoveMode()) exitMoveMode();
+      hideContextMenu();
+    }
+    const typing = e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA';
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) {
+      e.preventDefault();
+      undo();
+    }
+  });
+}
+
+// ── Init ─────────────────────────────────────────────────
+function initApp() {
+  restoreSession();
+  if (state.desks.length === 0) rebuildDesks(false);
+
+  setupEventListeners();
+  initUI();
+  initGroups();
+  initActivities();
+  initDragAndDrop();
+  initBlackboardResize();
+  renderAll();
+
+  // pagehide fires reliably on mobile and on tab close, where beforeunload is
+  // increasingly ignored.
+  window.addEventListener('pagehide', saveSession);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') saveSession();
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initApp);
