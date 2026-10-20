@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; font-src 'self'; form-action 'none'; base-uri 'self';">
+    content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'none'; font-src 'self'; form-action 'none'; base-uri 'self';">
   <title>Klassetavla</title>
   <!-- Inline favicon: avoids a 404 on every load without adding a file. -->
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🪑</text></svg>">
@@ -475,7 +475,7 @@
     <!-- Personvern / GDPR -->
     <div class="section">
       <label class="section-label">Personvern</label>
-      <p class="privacy-note">Elevdata lagres kun lokalt i din nettleser og sendes aldri til noen server.</p>
+      <p class="privacy-note">Elevdata lagres kun lokalt i din nettleser og sendes aldri til noen server. Siste økt lagres automatisk — bruk knappen under på en delt PC.</p>
       <button id="btn-clear-data" class="btn-secondary btn-danger mt-6">🗑️ Slett all lokal data</button>
     </div>
 
@@ -524,10 +524,8 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
-    crossorigin="anonymous"
-    referrerpolicy="no-referrer"
+  <script src="vendor/html2canvas.min.js"
     integrity="sha512-BNaRQnYJYiPSqHHDb58B0yaPfCu+Wgds8Gp/gU33kqBtgNS4tSPHuGibyoeqMV/TJlSKda6FXzoEyYGjTe+vXA=="></script>
-  <script type="module" src="src/main.js?v=26"></script>
+  <script type="module" src="src/main.js?v=27"></script>
 </body>
 </html>

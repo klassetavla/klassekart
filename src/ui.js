@@ -1,6 +1,6 @@
 'use strict';
 
-import { MAX_DESKS } from './constants.js';
+import { MAX_DESKS, MAX_NAME_LENGTH } from './constants.js';
 import {
   state, replaceState, createInitialState, pushUndo, popUndo, clearUndo,
   getMoveMode, setMoveMode, renameStudentRefs
@@ -266,6 +266,12 @@ function initDelegatedActions() {
 // ── New class ────────────────────────────────────────────
 export function newClass() {
   if (!confirm('Start ny klasse? Alt som ikke er lagret vil gå tapt.')) return;
+  resetToBlankClass();
+  showToast('Ny klasse opprettet');
+}
+
+/** Empty chart in the current mode, with no undo history to bring names back. */
+export function resetToBlankClass() {
   const mode = state.mode;
   replaceState(createInitialState());
   state.mode = mode;
@@ -274,7 +280,6 @@ export function newClass() {
   hideContextMenu();
   rebuildDesks(false);
   renderAll();
-  showToast('Ny klasse opprettet');
 }
 
 // ── Clipboard ────────────────────────────────────────────
@@ -292,7 +297,7 @@ export async function pasteFromClipboard() {
   const names = text
     .split(/[\n\r]+/)
     .flatMap(line => line.split(/[\t,;]+/))
-    .map(s => s.trim())
+    .map(s => s.trim().slice(0, MAX_NAME_LENGTH))
     .filter(Boolean);
 
   if (names.length === 0) { showToast('Ingen navn funnet'); return; }

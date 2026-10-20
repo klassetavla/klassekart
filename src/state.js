@@ -1,7 +1,7 @@
 'use strict';
 
 import {
-  MIN_GRID, MAX_GRID, MAX_DESK_COUNT, MAX_DESKS, MAX_UNDO,
+  MIN_GRID, MAX_GRID, MAX_DESK_COUNT, MAX_DESKS, MAX_NAME_LENGTH, MAX_UNDO,
   MIN_TEXT_SCALE, MAX_TEXT_SCALE, MAX_RULES,
   MIN_GROUP_SIZE, MAX_GROUP_SIZE, MIN_GROUP_COUNT, MAX_GROUP_COUNT,
   MAX_GROUP_HISTORY, MAX_ROLES, MAX_ROLE_LENGTH,
@@ -215,11 +215,17 @@ function pick(value, allowed, fallback) {
 }
 
 /** Trimmed, de-duplicated, length-capped list of non-empty strings. */
-function asNameList(value, max, maxLength = 100) {
+function asNameList(value, max, maxLength = MAX_NAME_LENGTH) {
   if (!Array.isArray(value)) return [];
   return [...new Set(
     value.filter(s => typeof s === 'string').map(s => s.trim().slice(0, maxLength)).filter(Boolean)
   )].slice(0, max);
+}
+
+// Ids end up in element ids; «teacher» is the teacher desk's own.
+const DESK_ID_RE = /^[\w-]{1,32}$/;
+function asDeskId(value, fallback) {
+  return typeof value === 'string' && DESK_ID_RE.test(value) && value !== 'teacher' ? value : fallback;
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -237,8 +243,8 @@ function sanitizeRules(parsed) {
   const rules = [];
   for (const r of raw) {
     if (!r || typeof r.a !== 'string' || typeof r.b !== 'string') continue;
-    const a = r.a.trim().slice(0, 100);
-    const b = r.b.trim().slice(0, 100);
+    const a = r.a.trim().slice(0, MAX_NAME_LENGTH);
+    const b = r.b.trim().slice(0, MAX_NAME_LENGTH);
     if (!a || !b || a === b) continue;
     // One rule per pair — «sammen» and «ikke sammen» for the same two students
     // can't both hold, and the add button enforces the same.
@@ -281,7 +287,7 @@ function sanitizeGroups(g) {
       members: (Array.isArray(grp?.members) ? grp.members : [])
         .filter(m => m && typeof m.name === 'string' && m.name.trim())
         .map(m => ({
-          name: m.name.trim().slice(0, 100),
+          name: m.name.trim().slice(0, MAX_NAME_LENGTH),
           role: typeof m.role === 'string' && m.role.trim() ? m.role.trim().slice(0, MAX_ROLE_LENGTH) : null
         }))
         .filter(m => {
@@ -415,7 +421,7 @@ export function sanitizeState(parsed) {
 
   if (Array.isArray(parsed.students)) {
     next.students = [...new Set(
-      parsed.students.filter(s => typeof s === 'string').map(s => s.trim()).filter(Boolean)
+      parsed.students.filter(s => typeof s === 'string').map(s => s.trim().slice(0, MAX_NAME_LENGTH)).filter(Boolean)
     )].slice(0, MAX_DESKS);
   }
 
@@ -445,12 +451,12 @@ export function sanitizeState(parsed) {
       .filter(d => d && typeof d === 'object')
       .slice(0, MAX_DESKS)
       .map((d, i) => ({
-        id:          typeof d.id === 'string' && d.id ? d.id : 'd' + (i + 1),
+        id:          asDeskId(d.id, 'd' + (i + 1)),
         col:         clampInt(d.col, MIN_GRID, next.gridCols, 1),
         row:         clampInt(d.row, MIN_GRID, next.gridRows, 1),
-        groupId:     typeof d.groupId === 'string' ? d.groupId : 'g' + (i + 1),
+        groupId:     asDeskId(d.groupId, 'g' + (i + 1)),
         studentName: typeof d.studentName === 'string' && d.studentName.trim()
-                       ? d.studentName.trim().slice(0, 100)
+                       ? d.studentName.trim().slice(0, MAX_NAME_LENGTH)
                        : null,
         locked:      d.locked === true,
         marked:      d.marked === true,

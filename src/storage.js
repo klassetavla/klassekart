@@ -1,11 +1,12 @@
 'use strict';
 
-import { LS_MAP, LS_LIST, LS_LAST, MAX_DESKS } from './constants.js';
+import { LS_MAP, LS_LIST, LS_LAST, MAX_DESKS, MAX_NAME_LENGTH, MAX_IMPORT_BYTES } from './constants.js';
 import { state, replaceState, sanitizeState } from './state.js';
 import { renderAll, renderSavedMaps, renderSavedLists, renderMismatchWarning,
          renderRuleList, updateStudentCount, updateDatalist } from './render.js';
 import { renderGroupsAll } from './groups-view.js';
 import { showToast } from './toast.js';
+import { resetToBlankClass } from './ui.js';
 
 const $ = id => document.getElementById(id);
 
@@ -17,6 +18,10 @@ export function safeName(name) {
 // ── Saved seating charts ─────────────────────────────────
 export function saveToLocalStorage() {
   const name = safeName(state.className);
+  if (LS_MAP + name === LS_LAST) {
+    showToast('«last» er et reservert navn — gi klassen et annet navn');
+    return;
+  }
   // safeName strips punctuation, so "7A", "7A!" and "7.A" all collapse to the
   // same key. Saving used to overwrite the older chart without a word.
   if (localStorage.getItem(LS_MAP + name) !== null &&
@@ -63,6 +68,9 @@ export function clearAllData() {
   const doomed = Object.keys(localStorage)
     .filter(k => k.startsWith(LS_MAP) || k.startsWith(LS_LIST) || k === LS_LAST);
   doomed.forEach(k => localStorage.removeItem(k));
+  // The names are still in memory, and pagehide would write them straight back
+  // as the session. Clear the screen too, so «slettet» really means deleted.
+  resetToBlankClass();
   renderSavedMaps();
   renderSavedLists();
   showToast(`${doomed.length} element(er) slettet fra nettleseren`);
@@ -98,7 +106,7 @@ export function loadList() {
     if (!Array.isArray(parsed)) { showToast('Ugyldig liste'); return; }
 
     state.students = [...new Set(
-      parsed.filter(s => typeof s === 'string').map(s => s.trim()).filter(Boolean)
+      parsed.filter(s => typeof s === 'string').map(s => s.trim().slice(0, MAX_NAME_LENGTH)).filter(Boolean)
     )].slice(0, MAX_DESKS);
 
     $('students-textarea').value  = state.students.join('\n');
@@ -136,6 +144,7 @@ export function exportJSON() {
 }
 
 export function importJSON(file) {
+  if (file.size > MAX_IMPORT_BYTES) { showToast('Filen er for stor til å være et klassekart'); return; }
   const reader = new FileReader();
   reader.onerror = () => showToast('Kunne ikke lese filen');
   reader.onload = e => {

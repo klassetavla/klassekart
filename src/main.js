@@ -1,7 +1,7 @@
 'use strict';
 
 import {
-  MAX_GRID, MAX_DESK_COUNT, MAX_DESKS, MIN_TEXT_SCALE, MAX_TEXT_SCALE, MAX_RULES
+  MAX_GRID, MAX_DESK_COUNT, MAX_DESKS, MAX_NAME_LENGTH, MIN_TEXT_SCALE, MAX_TEXT_SCALE, MAX_RULES
 } from './constants.js';
 import { state, pushUndo, getMoveMode, renameStudentRefs } from './state.js';
 import { computeAutoLayout } from './layout.js';
@@ -95,7 +95,7 @@ function addRule(type) {
 
 // ── Student textarea ─────────────────────────────────────
 function handleStudentInput(e) {
-  const newNames = e.target.value.split('\n').map(s => s.trim()).filter(Boolean);
+  const newNames = e.target.value.split('\n').map(s => s.trim().slice(0, MAX_NAME_LENGTH)).filter(Boolean);
   syncDupWarning();
 
   // If exactly one name was swapped for another, treat it as a rename and

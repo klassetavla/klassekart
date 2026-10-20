@@ -1,6 +1,7 @@
 'use strict';
 
 import { shuffle } from './shuffle.js';
+import { plainTextLine } from './groups.js';
 import {
   CATEGORY_BANK, CLASSIC_CATEGORIES, EASY_LETTERS, HARD_LETTERS,
   MAX_CATEGORIES, MAX_CAT_LENGTH, MAX_POINTS, MAX_PENALTY
@@ -170,7 +171,7 @@ export function formatClock(seconds) {
 /** Copy-ready summary of the whole game. */
 export function gameAsText(teams, rounds, { title, dateLabel }) {
   const rows  = standings(teams, rounds);
-  const lines = [`${title} – Mariusleken${dateLabel ? ` (${dateLabel})` : ''}`, ''];
+  const lines = [`${plainTextLine(title)} – Mariusleken${dateLabel ? ` (${dateLabel})` : ''}`, ''];
   rounds.forEach((r, i) => {
     const docked = teams
       .map((t, ti) => (r.penalties?.[ti] > 0 ? `${t.name} −${r.penalties[ti]}` : null))

@@ -16,6 +16,8 @@ export const MIN_GRID       = 1;
 export const MAX_GRID       = 20;
 export const MAX_DESK_COUNT = 60;  // mirrors <input id="desk-count" max>
 export const MAX_DESKS      = 400; // hard ceiling for imported files
+export const MAX_NAME_LENGTH = 100; // per student name, however it arrives
+export const MAX_IMPORT_BYTES = 2_000_000; // a real chart is a few kB
 export const MAX_UNDO       = 20;
 export const MIN_TEXT_SCALE = 0.5;
 export const MAX_TEXT_SCALE = 1.5;
@@ -23,6 +25,8 @@ export const MAX_TEXT_SCALE = 1.5;
 // ── Storage keys ─────────────────────────────────────────
 export const LS_MAP  = 'klassekart_'; // prefix for saved seating charts
 export const LS_LIST = 'kl_liste_';   // prefix for saved student lists
+// Shares the LS_MAP prefix for historical reasons — renaming it would orphan
+// every teacher's last session. Instead «last» is reserved as a chart name.
 export const LS_LAST = 'klassekart_last';
 
 // ── Paper ────────────────────────────────────────────────

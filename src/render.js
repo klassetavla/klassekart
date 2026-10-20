@@ -2,7 +2,7 @@
 
 import {
   CELL_SIZE, CELL_GAP, CELL_STRIDE, CTRL_SIZE, BB_MARGIN, MIN_BB_SIZE,
-  LS_MAP, LS_LIST, VALID_PRINT_FORMATS, VALID_PRINT_ORIENTATIONS,
+  LS_MAP, LS_LIST, LS_LAST, VALID_PRINT_FORMATS, VALID_PRINT_ORIENTATIONS,
   MM_TO_PX, PAGE_MARGIN_MM, PAGE_SIZES_MM, PRINT_HEADER_PX, MIN_PRINT_ZOOM,
   PRINT_FIT_SLACK
 } from './constants.js';
@@ -547,7 +547,7 @@ function renderSavedSelect(selectId, prefix, placeholder) {
   sel.appendChild(blank);
 
   Object.keys(localStorage)
-    .filter(k => k.startsWith(prefix))
+    .filter(k => k.startsWith(prefix) && k !== LS_LAST)
     .map(k => k.slice(prefix.length))
     .sort((a, b) => a.localeCompare(b, 'no'))
     .forEach(name => {

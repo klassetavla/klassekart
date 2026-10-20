@@ -171,6 +171,8 @@ export function drawGroups(students, sizes, { rules = [], history = [], rand = M
   const ids = [...students.keys()];
   if (!constrained) return finish(deal(shuffle(ids, rand)));
 
+  // Only used for the starting cost; swaps are scored incrementally below, so
+  // a hostile import with two groups of 200 doesn't cost O(group²) per step.
   const groupCost = members => {
     let c = 0;
     for (let x = 0; x < members.length; x++) {
@@ -184,10 +186,9 @@ export function drawGroups(students, sizes, { rules = [], history = [], rand = M
 
   for (let restart = 0; restart < RESTARTS && bestCost > 0; restart++) {
     const groups = deal(shuffle(ids, rand));
-    const costs  = groups.map(groupCost);
     // Shifted by HARD per «sammen» rule so that zero means perfect: nothing
     // broken and nobody repeated.
-    let total = HARD * togetherRules + costs.reduce((a, b) => a + b, 0);
+    let total = HARD * togetherRules + groups.map(groupCost).reduce((a, b) => a + b, 0);
     const iterations = Math.min(20000, n * 150);
 
     for (let it = 0; it < iterations && total > 0; it++) {
@@ -200,16 +201,16 @@ export function drawGroups(students, sizes, { rules = [], history = [], rand = M
       const x = Math.floor(rand() * gp.length);
       const y = Math.floor(rand() * gq.length);
 
-      [gp[x], gq[y]] = [gq[y], gp[x]];
-      const cp    = groupCost(gp);
-      const cq    = groupCost(gq);
-      const delta = cp + cq - costs[p] - costs[q];
+      // a leaves gp for gq and b goes the other way; only their pairs change.
+      const a = gp[x];
+      const b = gq[y];
+      let delta = 0;
+      for (const k of gp) if (k !== a) delta += score[b * n + k] - score[a * n + k];
+      for (const k of gq) if (k !== b) delta += score[a * n + k] - score[b * n + k];
       if (delta <= 0) {
-        costs[p] = cp;
-        costs[q] = cq;
-        total   += delta;
-      } else {
-        [gp[x], gq[y]] = [gq[y], gp[x]];
+        gp[x]  = b;
+        gq[y]  = a;
+        total += delta;
       }
     }
 
@@ -297,8 +298,16 @@ export function resultDiff(result, present) {
   };
 }
 
+/**
+ * A copied line that starts with = + - @ becomes a formula when pasted into
+ * Excel or Sheets, and the title comes from an importable class name.
+ */
+export function plainTextLine(text) {
+  return /^[=+\-@]/.test(text) ? `'${text}` : text;
+}
+
 export function groupsAsText(result, { title, dateLabel, showRoles }) {
-  const lines = [`${title} – grupper${dateLabel ? ` (${dateLabel})` : ''}`, ''];
+  const lines = [`${plainTextLine(title)} – grupper${dateLabel ? ` (${dateLabel})` : ''}`, ''];
   result.groups.forEach((grp, i) => {
     const names = grp.members.map(m => (showRoles && m.role ? `${m.name} (${m.role})` : m.name));
     lines.push(`Gruppe ${i + 1}: ${names.length ? names.join(', ') : '(tom)'}`);
