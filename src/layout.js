@@ -1,6 +1,6 @@
 'use strict';
 
-import { CELL_SIZE, CELL_GAP, CELL_STRIDE, AISLE_SIZE } from './constants.js';
+import { CELL_SIZE, CELL_GAP, CELL_STRIDE, AISLE_SIZE } from './constants.js?v=28';
 
 // Pure geometry and layout maths. No state, no DOM — this is the part that is
 // worth testing in isolation.

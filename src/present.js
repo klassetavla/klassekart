@@ -1,6 +1,6 @@
 'use strict';
 
-import { fitChartToScreen, initChartFit } from './render.js';
+import { fitChartToScreen, initChartFit } from './render.js?v=28';
 
 // «📺 Vis for klassen» for the seating chart: hides every menu and control and
 // scales the chart up to fill the screen — the chart's counterpart to the

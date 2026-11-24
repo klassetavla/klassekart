@@ -1,11 +1,11 @@
 'use strict';
 
-import { MAX_GROUP_HISTORY } from './constants.js';
-import { state, pushUndo, deskCells } from './state.js';
-import { todayKey, presentStudents, buildResult, pastGroupings } from './groups.js';
-import { renderClassroom, renderMismatchWarning } from './render.js';
-import { renderGroupsAll } from './groups-view.js';
-import { showToast } from './toast.js';
+import { MAX_GROUP_HISTORY } from './constants.js?v=28';
+import { state, pushUndo, deskCells } from './state.js?v=28';
+import { todayKey, presentStudents, buildResult, pastGroupings } from './groups.js?v=28';
+import { renderClassroom, renderMismatchWarning } from './render.js?v=28';
+import { renderGroupsAll } from './groups-view.js?v=28';
+import { showToast } from './toast.js?v=28';
 
 // Bridges between the seating chart and the groups: make groups out of who
 // sits together, or seat the drawn groups together.

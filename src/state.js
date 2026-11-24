@@ -9,8 +9,10 @@ import {
   DEFAULT_SECONDS, SECONDS_CHOICES, CLASSIC_CATEGORIES,
   VALID_PRINT_FORMATS, VALID_PRINT_ORIENTATIONS, VALID_BB_POSITIONS, VALID_GROUP_SIZES,
   VALID_MODES, VALID_RULE_TYPES, VALID_GROUP_SIZE_MODES, VALID_ACTIVITIES, VALID_GAME_PHASES
-} from './constants.js';
-import { normalizeCategories, letterPool, defaultTeamName } from './activities.js';
+} from './constants.js?v=28';
+import { normalizeCategories, letterPool, defaultTeamName } from './activities.js?v=28';
+import { CELL_STRIDE, CELL_GAP, CTRL_SIZE } from './constants.js?v=28';
+import { chartTracks } from './layout.js?v=28';
 
 // ── State shape ──────────────────────────────────────────
 // desks: [{id, col, row, groupId, studentName, locked, marked, size}]
@@ -113,9 +115,11 @@ const SCOPE_KEYS = {
   groups:     ['groups'],
   activities: ['activities']
 };
-// Everything except the tab being shown — for edits that reach across tools,
-// such as renaming a student or dropping removed students from every tool.
-const ALL_KEYS = Object.keys(createInitialState()).filter(k => k !== 'mode');
+// For edits that reach across tools, such as renaming a student or dropping
+// removed students from every tool. Settings that only change on purpose — the
+// class name, text size, print options — are left out, so undoing a rename
+// never also reverts them.
+const ALL_KEYS = [...SCOPE_KEYS.seating, 'students', 'rules', 'groups', 'activities'];
 
 const undoStacks = { seating: [], groups: [], activities: [] };
 
@@ -125,7 +129,9 @@ function deepClone(obj) {
 
 /**
  * Remembers the current state for «Angre» in the tab that is showing.
- * opts.all: snapshot every tool, for edits that change more than this tab.
+ * opts.all:    snapshot every tool, for edits that change more than this tab.
+ * opts.layout: false for chart edits that don't arrange the desks (the teacher
+ *              desk), so the first draw still lays the room out by itself.
  */
 export function pushUndo(opts = {}) {
   const stack = undoStacks[state.mode] || undoStacks.seating;
@@ -134,6 +140,10 @@ export function pushUndo(opts = {}) {
   keys.forEach(k => { snapshot[k] = deepClone(state[k]); });
   stack.push({ keys, snapshot });
   if (stack.length > MAX_UNDO) stack.shift();
+  // Any edit made in the chart (a drag, a lock, placing students…) makes the
+  // layout the teacher's own: the next draw must not replace it with an
+  // automatic one. Undo puts the old value back with the snapshot.
+  if (state.mode === 'seating' && !opts.all && opts.layout !== false) state.hasRandomized = true;
 }
 
 /** Pops one step for the current tab. Returns false when there was nothing to
@@ -562,6 +572,25 @@ export function sanitizeState(parsed) {
     const after  = clampInt(inset.after,  0, 2000, 0);
     // before/after both 0 means "never customised" — fall back to the default.
     next.blackboardInset = (before === 0 && after === 0) ? null : { before, after };
+  }
+
+  // Before version 3 every row and column was a full desk wide. Now empty ones
+  // are narrow aisles, so a board the teacher had resized is scaled by how much
+  // the desk grid shrank — same proportions, not the same pixels.
+  if (next.blackboardInset && !(Number(parsed.version) >= 3)) {
+    const horiz = next.blackboardPosition === 'top' || next.blackboardPosition === 'bottom';
+    const n     = horiz ? next.gridCols : next.gridRows;
+    const oldGrid = n * CELL_STRIDE - CELL_GAP;
+    const t       = chartTracks(next.desks, next.teacherDesk, next.gridCols, next.gridRows);
+    const newGrid = (horiz ? t.cols : t.rows).length;
+    if (oldGrid > 0 && newGrid > 0 && newGrid < oldGrid) {
+      const k = newGrid / oldGrid;
+      const { before, after } = next.blackboardInset;
+      next.blackboardInset = {
+        before: Math.round(Math.min(before, CTRL_SIZE) + Math.max(0, before - CTRL_SIZE) * k),
+        after:  Math.round(after * k)
+      };
+    }
   }
 
   // A restored chart already has a layout; auto-layout must not overwrite it

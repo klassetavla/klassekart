@@ -1,10 +1,10 @@
 'use strict';
 
-import { LS_MAP, LS_LIST, LS_LAST, MAX_IMPORT_BYTES } from './constants.js';
-import { state } from './state.js';
-import { showToast } from './toast.js';
-import { prepareChartForExport } from './render.js';
-import { LS_PREFIX, importClass, resetAfterWipe } from './classes.js';
+import { LS_MAP, LS_LIST, LS_LAST, MAX_IMPORT_BYTES } from './constants.js?v=28';
+import { state } from './state.js?v=28';
+import { showToast } from './toast.js?v=28';
+import { prepareChartForExport } from './render.js?v=28';
+import { LS_PREFIX, importClass, resetAfterWipe } from './classes.js?v=28';
 
 // Files and wiping. Saving and loading classes lives in classes.js.
 

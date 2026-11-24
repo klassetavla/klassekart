@@ -3,18 +3,18 @@
 import {
   MIN_GROUP_SIZE, MAX_GROUP_SIZE, MIN_GROUP_COUNT, MAX_GROUP_COUNT,
   MAX_GROUP_HISTORY, MAX_ROLES, MAX_ROLE_LENGTH, ROLE_SUGGESTIONS
-} from './constants.js';
-import { state, pushUndo, detectDuplicates } from './state.js';
+} from './constants.js?v=28';
+import { state, pushUndo, detectDuplicates } from './state.js?v=28';
 import {
   todayKey, absentToday, presentStudents, groupSizes, describeSizes, drawGroups,
   brokenGroupRules, pastGroupings, buildResult, fillRoles, moveMember, resultDiff,
   groupsAsText
-} from './groups.js';
-import { showToast } from './toast.js';
-import { renderRuleList } from './rules-view.js';
-import { syncBridgeButtons } from './bridges.js';
-import { renderActivitiesAll } from './activities-view.js';
-import { renderClassroom, renderMismatchWarning } from './render.js';
+} from './groups.js?v=28';
+import { showToast } from './toast.js?v=28';
+import { renderRuleList } from './rules-view.js?v=28';
+import { syncBridgeButtons } from './bridges.js?v=28';
+import { renderActivitiesAll } from './activities-view.js?v=28';
+import { renderClassroom, renderMismatchWarning } from './render.js?v=28';
 
 // Everything on screen for the group tool: the settings panel, the group cards,
 // and tavlemodus. Also today's absence list in the left panel, which every tool

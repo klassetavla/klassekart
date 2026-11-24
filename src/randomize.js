@@ -1,8 +1,8 @@
 'use strict';
 
-import { state } from './state.js';
-import { areNeighbors } from './layout.js';
-import { shuffle } from './shuffle.js';
+import { state } from './state.js?v=28';
+import { areNeighbors } from './layout.js?v=28';
+import { shuffle } from './shuffle.js?v=28';
 
 // Fresh starting shuffles tried before settling for the best one found. Each
 // start is improved by swapping; restarts only matter when rules conflict.

@@ -6,16 +6,16 @@ import {
   MM_TO_PX, PAGE_MARGIN_MM, PAGE_SIZES_MM, PRINT_HEADER_PX, MIN_PRINT_ZOOM,
   PRINT_FIT_SLACK, MIN_SCREEN_ZOOM, MAX_PRESENT_ZOOM,
   NAME_MAX_PX, NAME_FLOOR_PX, NAME_MIN_PX, NAME_MAX_LINES
-} from './constants.js';
+} from './constants.js?v=28';
 import {
   state, isFreeDesk, studentsWithoutDesk, isAxisEmpty, detectDuplicates, getMoveMode
-} from './state.js';
-import { chartTracks, trackSpan } from './layout.js';
-import { todayKey, absentToday } from './groups.js';
-import { renderGroupsAll } from './groups-view.js';
-import { renderActivitiesAll } from './activities-view.js';
-import { renderRuleList } from './rules-view.js';
-import { renderClassBar } from './classes.js';
+} from './state.js?v=28';
+import { chartTracks, trackSpan } from './layout.js?v=28';
+import { todayKey, absentToday } from './groups.js?v=28';
+import { renderGroupsAll } from './groups-view.js?v=28';
+import { renderActivitiesAll } from './activities-view.js?v=28';
+import { renderRuleList } from './rules-view.js?v=28';
+import { renderClassBar } from './classes.js?v=28';
 
 // Re-exported so callers keep importing every render function from one place.
 export { renderRuleList };
@@ -590,24 +590,37 @@ export function syncBlackboard() {
   cls.classList.add('bb-' + pos);
 
   const isHoriz = pos === 'top' || pos === 'bottom';
-  const size    = Math.max(MIN_BB_SIZE, blackboardTrackLength() - inset.before - inset.after);
+  const track   = blackboardTrackLength();
+  // The inset is stored in pixels, but the track shrinks when a row or column
+  // becomes a narrow aisle (and charts from before the aisles were measured
+  // on a longer one). Scale the margins down so the board never squeezes
+  // below its minimum or sticks out past the desks.
+  let insetBefore = inset.before;
+  let insetAfter  = inset.after;
+  const room = Math.max(0, track - MIN_BB_SIZE);
+  if (insetBefore + insetAfter > room) {
+    const k = room / (insetBefore + insetAfter);
+    insetBefore = Math.floor(insetBefore * k);
+    insetAfter  = Math.floor(insetAfter * k);
+  }
+  const size = Math.max(MIN_BB_SIZE, track - insetBefore - insetAfter);
 
   // The row/column controls are hidden when printing, which pulls the desk grid
   // CTRL_SIZE closer to the edge. --ctrl-shift (0 on screen, -CTRL_SIZE in
   // print, set in styles.css) moves the board by the same amount so it stays
   // aligned with the desks on paper.
-  const before = `calc(${inset.before}px + var(--ctrl-shift, 0px))`;
+  const before = `calc(${insetBefore}px + var(--ctrl-shift, 0px))`;
 
   if (isHoriz) {
     Object.assign(bb.style, {
       width: size + 'px', height: '',
-      marginLeft: before, marginRight: inset.after + 'px',
+      marginLeft: before, marginRight: insetAfter + 'px',
       marginTop: '', marginBottom: ''
     });
   } else {
     Object.assign(bb.style, {
       height: size + 'px', width: '',
-      marginTop: before, marginBottom: inset.after + 'px',
+      marginTop: before, marginBottom: insetAfter + 'px',
       marginLeft: '', marginRight: ''
     });
   }
@@ -778,9 +791,14 @@ export function fitChartToScreen() {
   const padX  = (parseFloat(ws.paddingLeft) || 0) + (parseFloat(ws.paddingRight) || 0);
   const padB  = parseFloat(ws.paddingBottom) || 0;
   // Space from the chart's top edge to the bottom of the wrapper's content box.
+  // When presenting, the chart is centred vertically, so its current top edge
+  // says nothing about the room it has — use the whole content box.
   const top   = cr.top - wr.top + wrapper.scrollTop;
+  const padT  = parseFloat(ws.paddingTop) || 0;
   const availW = wrapper.clientWidth - padX;
-  const availH = wrapper.clientHeight - top - padB;
+  const availH = presenting
+    ? wrapper.clientHeight - padT - padB
+    : wrapper.clientHeight - top - padB;
 
   const max  = presenting ? MAX_PRESENT_ZOOM : 1;
   const min  = presenting ? 0.2 : MIN_SCREEN_ZOOM;

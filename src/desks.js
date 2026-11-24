@@ -1,13 +1,13 @@
 'use strict';
 
-import { MIN_GRID, MAX_GRID } from './constants.js';
+import { MIN_GRID, MAX_GRID } from './constants.js?v=28';
 import {
   state, pushUndo, isFreeDesk, freeDesks, studentsWithoutDesk,
   deskCells, deskAt, setMoveMode
-} from './state.js';
-import { computeLayout, calcRequiredRows } from './layout.js';
-import { renderAll, renderClassroom, renderMismatchWarning, updateGridDisplay } from './render.js';
-import { showToast } from './toast.js';
+} from './state.js?v=28';
+import { computeLayout, calcRequiredRows } from './layout.js?v=28';
+import { renderAll, renderClassroom, renderMismatchWarning, updateGridDisplay } from './render.js?v=28';
+import { showToast } from './toast.js?v=28';
 
 const $ = id => document.getElementById(id);
 
@@ -261,6 +261,11 @@ export function exitMoveMode() {
 }
 
 // ── Teacher desk ─────────────────────────────────────────
+/** Puts the teacher desk by the board, making room for it. */
+export function placeTeacherDesk() {
+  addTeacherDesk();
+}
+
 function addTeacherDesk() {
   const pos       = state.blackboardPosition || 'top';
   const centerCol = Math.ceil(state.gridCols / 2);
@@ -315,7 +320,7 @@ function removeTeacherDesk() {
 }
 
 export function toggleTeacherDesk() {
-  pushUndo();
+  pushUndo({ layout: false });
   if (state.teacherDesk) removeTeacherDesk();
   else addTeacherDesk();
   syncTeacherButton();
@@ -323,7 +328,7 @@ export function toggleTeacherDesk() {
 }
 
 export function clearTeacherDesk() {
-  pushUndo();
+  pushUndo({ layout: false });
   removeTeacherDesk();
   syncTeacherButton();
   renderClassroom();

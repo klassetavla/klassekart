@@ -1,12 +1,13 @@
 'use strict';
 
-import { LS_MAP, LS_LIST, LS_LAST, MAX_DESKS, MAX_NAME_LENGTH } from './constants.js';
+import { LS_MAP, LS_LIST, LS_LAST, MAX_DESKS, MAX_NAME_LENGTH } from './constants.js?v=28';
 import {
   state, replaceState, sanitizeState, createInitialState, clearUndo, setMoveMode
-} from './state.js';
-import { renderAll, renderClassroom, updatePrintHeader } from './render.js';
-import { rebuildDesks } from './desks.js';
-import { showToast } from './toast.js';
+} from './state.js?v=28';
+import { renderAll, renderClassroom, updatePrintHeader } from './render.js?v=28';
+import { rebuildDesks } from './desks.js?v=28';
+import { showToast } from './toast.js?v=28';
+import { hideContextMenu } from './ui.js?v=28';
 
 // ── Klasser ──────────────────────────────────────────────
 // A class is the one thing the teacher saves: names, rules, seating chart,
@@ -34,6 +35,10 @@ const $ = id => document.getElementById(id);
 let currentId  = null;
 let lastSaved  = null;  // what is stored for currentId, as serialised by serialize()
 let saveFailed = false;
+// True when the old data could not be brought over (storage full). Nothing is
+// written then — not even the index — so the migration runs again next time
+// instead of being marked done with classes missing.
+let migrationPending = false;
 
 // ── Helpers ──────────────────────────────────────────────
 export function displayName(name) {
@@ -127,6 +132,7 @@ function install(s) {
   }
   clearUndo();
   setMoveMode(null);
+  hideContextMenu();
 }
 
 // ── Saving ───────────────────────────────────────────────
@@ -148,13 +154,18 @@ function setStatus(kind) {
   }
 }
 
-/** Writes the current class if anything changed since the last write. */
+/** Writes the current class if anything changed since the last write.
+ *  Returns false when there are changes that could not be stored. */
 export function saveNow() {
-  if (!currentId) return;
+  if (!currentId) return true;
   const json = serialize();
   if (json === lastSaved) {
-    rememberMode();
-    return;
+    if (!migrationPending) rememberMode();
+    return true;
+  }
+  if (migrationPending) {
+    setStatus('error');
+    return false;
   }
   try {
     localStorage.setItem(LS_CLASS + currentId, json);
@@ -167,11 +178,24 @@ export function saveNow() {
     if (saveFailed) showToast('Lagret igjen ✓');
     saveFailed = false;
     setStatus('saved');
+    return true;
   } catch {
     if (!saveFailed) showToast('Kunne ikke lagre — nettleserens lagringsplass kan være full');
     saveFailed = true;
     setStatus('error');
+    return false;
   }
+}
+
+/** Before leaving the class on screen: true when it is safe to go. If the
+ *  class can't be stored, the teacher decides — with a way to keep it. */
+function canLeaveClass() {
+  if (saveNow()) return true;
+  return confirm(
+    'Endringene i denne klassen kunne ikke lagres (lagringsplassen i nettleseren er full).\n\n' +
+    'Velg Avbryt, og bruk «Last ned klassen som fil» i klassemenyen for å ta vare på dem.\n' +
+    'Velg OK for å fortsette uten å lagre.'
+  );
 }
 
 function rememberMode() {
@@ -192,7 +216,7 @@ function startBlank() {
 
 export function switchClass(id) {
   if (id === currentId) return;
-  saveNow();
+  if (!canLeaveClass()) return;
   const s = parseClass(localStorage.getItem(LS_CLASS + id));
   if (!s) {
     showToast('Fant ikke klassen');
@@ -209,14 +233,14 @@ export function switchClass(id) {
 }
 
 export function newClass() {
-  saveNow();
+  if (!canLeaveClass()) return;
   startBlank();
   renderAll();
   startRename();
 }
 
 function duplicateClass() {
-  saveNow();
+  if (!canLeaveClass()) return;
   const copy = structuredClone(state);
   copy.className = displayName(state.className) + ' (kopi)';
   install(copy);
@@ -254,7 +278,7 @@ export function importClass(parsed, fileName = '') {
   const base = (s.className || fileName.replace(/\.json$/i, '')).trim().slice(0, 100);
   const taken = new Set(listClasses().map(c => displayName(c.name).toLowerCase()));
   s.className = taken.has(displayName(base).toLowerCase()) ? `${displayName(base)} (importert)` : base;
-  saveNow();
+  if (!canLeaveClass()) return;
   install(s);
   currentId = newId();
   lastSaved = null;
@@ -265,6 +289,7 @@ export function importClass(parsed, fileName = '') {
 
 /** After «Slett all lokal data». */
 export function resetAfterWipe() {
+  migrationPending = false;
   startBlank();
   renderAll();
 }
@@ -367,14 +392,21 @@ function migrateLegacy() {
   const idx = { version: 1, current: null, mode, classes: [] };
   const writes = found.map(f => ({ id: newId() + Math.random().toString(36).slice(2, 4), ...f }));
   // Everything is written before the index, so a full disk leaves the old data
-  // in charge and the migration simply runs again next time.
-  writes.forEach(w => {
-    localStorage.setItem(LS_CLASS + w.id, serialize(w.state));
-    upsertEntry(idx, w.id, w.state);
-  });
-  idx.current = (writes.find(w => w.isSession) ||
-                 [...writes].sort((a, b) => collator.compare(displayName(a.state.className), displayName(b.state.className)))[0]).id;
-  writeIndex(idx);
+  // in charge and the migration simply runs again next time. What did get
+  // written is removed again, so retries don't pile up copies.
+  try {
+    writes.forEach(w => {
+      localStorage.setItem(LS_CLASS + w.id, serialize(w.state));
+      upsertEntry(idx, w.id, w.state);
+    });
+    idx.current = (writes.find(w => w.isSession) ||
+                   [...writes].sort((a, b) => collator.compare(displayName(a.state.className), displayName(b.state.className)))[0]).id;
+    writeIndex(idx);
+  } catch (err) {
+    writes.forEach(w => { try { localStorage.removeItem(LS_CLASS + w.id); } catch { /* ignore */ } });
+    try { localStorage.removeItem(LS_INDEX); } catch { /* ignore */ }
+    throw err;
+  }
   return { current: idx.current, mode };
 }
 
@@ -385,12 +417,14 @@ export function initClasses() {
     try {
       if (migrateLegacy()) idx = readIndex();
     } catch {
-      // Storage full or blocked: fall back to the old last session, read-only.
+      // Storage full or blocked: show the old last session so the teacher can
+      // keep working, but write nothing until the migration has succeeded.
+      migrationPending = true;
       const last = readJSON(LS_LAST);
       if (last && Array.isArray(last.desks)) {
         install(toState(last));
         currentId = newId();
-        lastSaved = null;
+        lastSaved = serialize();
       }
     }
   }
@@ -412,6 +446,10 @@ export function initClasses() {
     state.mode = idx.mode;
   }
   if (!currentId) startBlank();
+  if (migrationPending) {
+    setStatus('error');
+    setTimeout(() => showToast('Nettleserens lagringsplass er full — endringer lagres ikke før det er ryddet plass'), 800);
+  }
 
   setInterval(saveNow, SAVE_EVERY_MS);
   // pagehide fires reliably on tab close, where beforeunload is often ignored.
@@ -422,14 +460,34 @@ export function initClasses() {
   // Another tab saved this class. Take its version — unless there are edits
   // here that haven't been written yet, in which case ours win on the next tick.
   window.addEventListener('storage', e => {
-    if (!currentId || e.key !== LS_CLASS + currentId || !e.newValue) return;
+    if (!currentId || migrationPending) return;
+    // «Slett all lokal data» in another tab.
+    if (e.key === null) {
+      if (!readIndex()) resetAfterWipe();
+      return;
+    }
+    if (e.key !== LS_CLASS + currentId) return;
     if (serialize() !== lastSaved) return;
+    if (e.newValue === null) {
+      // The class was deleted in another tab: don't bring it back.
+      const idx  = readIndex();
+      const next = idx && [...idx.classes].sort((a, b) => b.updated - a.updated)[0];
+      const s    = next && parseClass(localStorage.getItem(LS_CLASS + next.id));
+      if (s) {
+        install(s);
+        currentId = next.id;
+        lastSaved = serialize();
+      } else {
+        startBlank();
+      }
+      renderAll();
+      return;
+    }
     const s = parseClass(e.newValue);
     if (!s) return;
-    const mode = state.mode;
-    replaceState(s);
-    state.mode = mode;
-    if (state.desks.length === 0) rebuildDesks(false);
+    // Through install(), so this tab's undo steps — which belong to the
+    // version it is replacing — can't be replayed over the other tab's work.
+    install(s);
     lastSaved = serialize();
     renderAll();
   });

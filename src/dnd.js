@@ -1,11 +1,11 @@
 'use strict';
 
-import { MIN_BB_SIZE } from './constants.js';
-import { state, pushUndo } from './state.js';
+import { MIN_BB_SIZE } from './constants.js?v=28';
+import { state, pushUndo } from './state.js?v=28';
 import {
   renderClassroom, syncBlackboard, defaultBlackboardInset, blackboardTrackLength, screenZoom
-} from './render.js';
-import { moveDesk, swapRegularDesks, swapWithTeacher } from './desks.js';
+} from './render.js?v=28';
+import { moveDesk, swapRegularDesks, swapWithTeacher } from './desks.js?v=28';
 
 let dragDeskId = null;
 let hovered    = null;

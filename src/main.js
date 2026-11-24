@@ -2,28 +2,28 @@
 
 import {
   MAX_GRID, MAX_DESK_COUNT, MAX_DESKS, MAX_NAME_LENGTH, MIN_TEXT_SCALE, MAX_TEXT_SCALE, MAX_RULES
-} from './constants.js';
+} from './constants.js?v=28';
 import {
   state, pushUndo, getMoveMode, renameStudentRefs, dropRemovedStudents, hasRemovedStudents,
   createInitialState
-} from './state.js';
-import { computeAutoLayout } from './layout.js';
+} from './state.js?v=28';
+import { computeAutoLayout } from './layout.js?v=28';
 import {
   renderAll, renderClassroom, renderMismatchWarning, updateGridDisplay,
   updatePrintPageStyle, updatePrintHeader, updateStudentCount, updateDatalist,
   refreshDeskFontSizes, renderRuleList, syncDupWarning, updatePrintScale
-} from './render.js';
-import { rebuildDesks, toggleTeacherDesk, nudgeGrid, exitMoveMode } from './desks.js';
-import { randomizeSeating } from './randomize.js';
-import { initGroups, renderGroupsAll } from './groups-view.js';
-import { initActivities, renderActivitiesAll } from './activities-view.js';
-import { initDragAndDrop, initBlackboardResize } from './dnd.js';
-import { clearAllData, exportJSON, importJSON, exportPNG } from './storage.js';
-import { initClasses } from './classes.js';
-import { initBridges } from './bridges.js';
-import { initUI, undo, pasteFromClipboard, hideContextMenu } from './ui.js';
-import { showToast, hideToast } from './toast.js';
-import { initPresentMode } from './present.js';
+} from './render.js?v=28';
+import { rebuildDesks, toggleTeacherDesk, placeTeacherDesk, nudgeGrid, exitMoveMode } from './desks.js?v=28';
+import { randomizeSeating } from './randomize.js?v=28';
+import { initGroups, renderGroupsAll } from './groups-view.js?v=28';
+import { initActivities, renderActivitiesAll } from './activities-view.js?v=28';
+import { initDragAndDrop, initBlackboardResize } from './dnd.js?v=28';
+import { clearAllData, exportJSON, importJSON, exportPNG } from './storage.js?v=28';
+import { initClasses } from './classes.js?v=28';
+import { initBridges } from './bridges.js?v=28';
+import { initUI, undo, pasteFromClipboard, hideContextMenu } from './ui.js?v=28';
+import { showToast, hideToast } from './toast.js?v=28';
+import { initPresentMode } from './present.js?v=28';
 
 const $ = id => document.getElementById(id);
 
@@ -33,11 +33,13 @@ function handleRandomize() {
     showToast('Fjern duplikatnavn først');
     return;
   }
+  // Read before pushUndo, which marks the layout as the teacher's own.
+  const firstDraw = !state.hasRandomized;
   pushUndo();
 
   // The first randomisation also picks a sensible grid; later ones respect
   // whatever layout the teacher has arranged by hand.
-  if (!state.hasRandomized) {
+  if (firstDraw) {
     // One desk per student — 25 students and the default 24 desks used to
     // leave someone standing after the very first draw, and 3 students got 24.
     // A desk count the teacher typed in themselves is only ever raised.
@@ -48,11 +50,16 @@ function handleRandomize() {
       state.deskCount = Math.min(MAX_DESK_COUNT, needed);
       $('desk-count').value = state.deskCount;
     }
+    // The grid is about to be replaced; the teacher desk is put back by the
+    // board afterwards instead of being left outside the new grid.
+    const hadTeacher = !!state.teacherDesk;
+    state.teacherDesk = null;
     const auto = computeAutoLayout(state.deskCount, state.groupSize);
     state.gridCols = Math.min(MAX_GRID, auto.gridCols);
     state.gridRows = Math.min(MAX_GRID, auto.gridRows);
     updateGridDisplay();
     rebuildDesks(false);
+    if (hadTeacher) placeTeacherDesk();
     state.hasRandomized = true;
   }
 

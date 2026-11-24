@@ -1,21 +1,21 @@
 'use strict';
 
-import { MAX_DESKS, MAX_NAME_LENGTH } from './constants.js';
+import { MAX_DESKS, MAX_NAME_LENGTH } from './constants.js?v=28';
 import {
   state, pushUndo, popUndo, getMoveMode, renameStudentRefs, dropRemovedStudents
-} from './state.js';
+} from './state.js?v=28';
 import {
   renderAll, renderClassroom, renderMismatchWarning, renderStatsBanner,
   renderRuleList, syncBlackboard, deskFontSize,
   updateStudentCount, updateDatalist
-} from './render.js';
-import { renderGroupsAll } from './groups-view.js';
-import { renderActivitiesAll } from './activities-view.js';
+} from './render.js?v=28';
+import { renderGroupsAll } from './groups-view.js?v=28';
+import { renderActivitiesAll } from './activities-view.js?v=28';
 import {
   fixMissingDesks, removeExcessDesks, deleteAxis, moveAxis,
   enterMoveMode, exitMoveMode, toggleDeskWidth, clearTeacherDesk
-} from './desks.js';
-import { showToast } from './toast.js';
+} from './desks.js?v=28';
+import { showToast } from './toast.js?v=28';
 
 const $ = id => document.getElementById(id);
 

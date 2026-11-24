@@ -177,6 +177,11 @@ filene serveres som de er.
 | `ui.js` | Kontekstmeny, navneredigering, sidepaneler |
 | `main.js` | Kobler opp hendelser og starter appen |
 
+**Versjonsnummer:** `index.html` laster `styles.css?v=N` og `src/main.js?v=N`, og
+alle `import` i `src/` har samme `?v=N`. Øk N overalt (ett søk-og-erstatt) ved hver
+publisering som endrer JS eller CSS — ellers kan en nettleser blande gamle og nye
+moduler fra hurtigbufferen.
+
 **Kjøring lokalt:** ES-moduler krever HTTP — å åpne `index.html` rett fra
 filsystemet (`file://`) blokkeres av nettleseren. Start en lokal server:
 

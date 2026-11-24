@@ -1,9 +1,9 @@
 'use strict';
 
-import { RULE_SYMBOL } from './constants.js';
-import { state } from './state.js';
-import { brokenSeatRules } from './randomize.js';
-import { brokenGroupRules } from './groups.js';
+import { RULE_SYMBOL } from './constants.js?v=28';
+import { state } from './state.js?v=28';
+import { brokenSeatRules } from './randomize.js?v=28';
+import { brokenGroupRules } from './groups.js?v=28';
 
 // The rule list in the left sidebar. Its own module because both tools need to
 // refresh it — render.js after desk changes, groups-view.js after group changes
