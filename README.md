@@ -10,6 +10,19 @@ nettleseren, ingen installasjon nødvendig.
 
 ## Funksjoner
 
+### Klasser og lagring
+- Alt hører til en **klasse**: elevlisten, reglene, klassekartet, gruppene, hvem
+  som er borte og innstillingene for lekene
+- **Klassevelgeren** øverst til venstre bytter mellom klassene, og har ＋ Ny klasse,
+  Gi nytt navn, Lag en kopi, Last ned klassen som fil / Hent klasse fra fil (for å
+  flytte til en annen PC) og Slett klassen
+- **Alt lagres automatisk** i nettleseren — det finnes ingen «Lagre»-knapp. «Lagret ✓»
+  øverst viser at det er gjort
+- Elevlisten bestemmer: tar du en elev ut av listen, forsvinner eleven fra kartet,
+  gruppene og lagene når du er ferdig med å redigere listen (Ctrl+Z angrer)
+- Lagrede kart, elevlister og siste økt fra tidligere versjoner blir gjort om til
+  klasser første gang siden åpnes. De gamle dataene røres ikke
+
 ### Elever og oppsett
 - Skriv inn elevnavn (ett per linje) og velg antall pulter
 - **Lim inn fra Excel/Sheets** via knapp — importerer automatisk fra utklippstavlen
@@ -18,10 +31,18 @@ nettleseren, ingen installasjon nødvendig.
 - Velg plassering av tavlen: øverst, nederst, venstre eller høyre side
 - Juster tekststørrelse på pultene med skyveknapp
 
-### Randomisering og angring
-- Klikk **Randomiser** for å fordele elevene tilfeldig på pultene
-- **Ctrl+Z** (eller **↩ Angre**-knapp) angrer siste endring — opp til 20 steg bakover
-- **Låste pulter** hoppes over ved randomisering, slik at enkeltelevers faste plass bevares
+- **Noen er borte i dag** (venstre panel) — klikk bort fraværende. De holdes utenfor
+  grupper og lag, og pulten deres tones ned i kartet. Nullstilles av seg selv neste dag
+
+### Trekning og angring
+- Klikk **🔀 Trekk plasser** for å fordele elevene tilfeldig på pultene. Første
+  trekning i en ny klasse lager én pult per elev
+- **Ctrl+Z** (eller **↩ Angre**) angrer siste endring i fanen du står i — opp til 20
+  steg. Angre i Grupper rører aldri klassekartet, og omvendt
+- **Låste pulter** hoppes over ved trekning, slik at enkeltelevers faste plass bevares
+- **📺 Vis for klassen** viser kartet i fullskjerm uten menyer (Esc lukker)
+- Kartet skaleres så det får plass på skjermen, og tomme rader og kolonner
+  (midtgangene) tegnes smalt. Navnene brytes på flere linjer i stedet for å krympes
 
 ### Regler
 - Sett opp **🚫 Ikke sammen** og **🤝 Sammen** for par av elever — én felles regelliste
@@ -36,15 +57,17 @@ nettleseren, ingen installasjon nødvendig.
 
 ### Grupper
 Fanen **👥 Grupper** gjenbruker elevlisten og reglene fra klassekartet.
+- **🪑 Fra klassekartet** lager gruppene av dem som sitter sammen ved pultene, og
+  **👥 Plasser gruppene sammen** (i klassekartet) setter de trukne gruppene sammen ved
+  pultene
 - Del inn etter **elever per gruppe** eller **antall grupper** — gruppene blir alltid
   jevne (maks én elevs forskjell), og du ser inndelingen før du trekker
 - **Dra elever** mellom gruppene for å justere for hånd
 - **Kopier** gruppene som tekst (til Teams, Classroom e.l.) eller **skriv ut**
-- **📺 Tavlemodus**: fullskjerm med store gruppekort for smartboardet, der navnene
+- **📺 Vis for klassen**: fullskjerm med store gruppekort for smartboardet, der navnene
   deles ut fra en kortstokk. «✨ Del ut igjen» viser trekningen på nytt uten å trekke om
 
 Tillegg som er av til du slår dem på:
-- **Noen er borte i dag** — klikk bort fraværende; nullstilles av seg selv neste dag
 - **Unngå forrige grupper** — setter helst sammen elever som ikke har vært på gruppe
   sammen nylig (siste trekning per dag, opptil 5 dager). Reglene går alltid foran
 - **Tildel roller** — legg inn egne roller (med forslag), som deles ut tilfeldig i
@@ -101,15 +124,11 @@ av appen, og åpner spillet i fullskjerm — klart for projektoren.
 - Legg til en egen lærerpult som kan dras fritt i klasserommet
 
 ### Statistikkbanner
-- Viser løpende oversikt over antall låste, plasserte og tomme pulter
+- Viser løpende oversikt over antall låste, plasserte og tomme pulter, og elever på
+  pultene som ikke lenger er i elevlisten
 
 ### Duplikatoppdagelse
 - Advarer automatisk dersom samme elevnavn er skrevet inn mer enn én gang
-
-### Lagring
-- **Lagre flere kart** med navn direkte i nettleseren (localStorage)
-- **Elevlister** kan lagres og lastes inn separat under «Lagrede lister»
-- **Eksporter/importer** som JSON-fil for deling mellom enheter
 
 ### Eksport og utskrift
 - Velg papirformat (**A4/A3**) og retning (**Liggende/Stående**) før utskrift
@@ -118,8 +137,8 @@ av appen, og åpner spillet i fullskjerm — klart for projektoren.
   side. Fjern haken hvis du heller vil ha full størrelse og la kartet gå over
   flere sider
 - **Skjul tomme pulter** ved utskrift/eksport via avkrysningsboks
-- **🖨️ Skriv ut** (eller **Ctrl+P**) skriver ut klassekartet med klassenavn og dato øverst
-- **Eksporter som PNG** for å lagre klassekartet som bilde
+- **🖨️ Skriv ut** (over kartet, eller **Ctrl+P**) skriver ut klassekartet med klassenavn og dato øverst
+- **Lagre kartet som bilde (PNG)**
 
 ---
 
@@ -142,16 +161,19 @@ filene serveres som de er.
 | `randomize.js` | Stokking, og plassering som minimerer regelbrudd (bytte-søk) |
 | `shuffle.js` | Fisher–Yates — delt av pult-, gruppe- og lagtrekningen |
 | `groups.js` | Ren gruppelogikk: størrelser, trekning, roller, historikk, tekst |
-| `groups-view.js` | Gruppefanen: innstillinger, gruppekort, dra-og-slipp, tavlemodus |
+| `groups-view.js` | Gruppefanen: innstillinger, gruppekort, dra-og-slipp, tavlemodus, fravær |
 | `activities.js` | Ren spillogikk: bokstaver, kategorier, poeng, stilling, podium |
 | `activities-view.js` | Aktivitetsfanen: oppsett, fullskjermsspillet, poengføring, svarark |
 | `game-audio.js` | All lyd i spillet (WebAudio): pip, ventemusikk og fanfare |
 | `celebrate.js` | Raketter og konfetti på et canvas over spillskjermen |
 | `rules-view.js` | Regellisten, med live markering av brutte regler i alle faner |
-| `render.js` | DOM-tegning for klassekartet, regellisten og fanebytte |
+| `render.js` | DOM-tegning for klassekartet (skjermtilpasning, navnestørrelse), regellisten og fanebytte |
 | `desks.js` | Operasjoner på pulter, rader/kolonner og lærerpult |
 | `dnd.js` | Dra-og-slipp og tavlehåndtak |
-| `storage.js` | localStorage, JSON-import/eksport, PNG |
+| `classes.js` | Klassene: automatisk lagring, klassevelgeren, overføring fra eldre lagring |
+| `bridges.js` | Grupper fra klassekartet, og gruppene plassert sammen i kartet |
+| `present.js` | «Vis for klassen» for klassekartet |
+| `storage.js` | JSON-fil (last ned/hent), PNG, sletting av all lokal data |
 | `ui.js` | Kontekstmeny, navneredigering, sidepaneler |
 | `main.js` | Kobler opp hendelser og starter appen |
 

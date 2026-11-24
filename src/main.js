@@ -63,8 +63,8 @@ function handleRandomize() {
   // No count: the screen may be on the projector. Which rules broke is shown
   // in the (closed) rules panel.
   showToast(violations > 0
-    ? 'Randomisert — ikke alle regler kunne oppfylles'
-    : 'Pulter randomisert!');
+    ? 'Plassene er trukket — ikke alle regler kunne oppfylles'
+    : 'Plassene er trukket!');
 }
 
 // ── Rules ────────────────────────────────────────────────

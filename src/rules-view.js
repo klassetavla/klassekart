@@ -93,5 +93,5 @@ export function renderRuleList() {
   $('use-rules').checked           = active;
   $('use-rules-label').textContent = state.mode === 'activities' ? 'Bruk reglene når lagene trekkes'
                                    : byTeam                     ? 'Bruk reglene når gruppene trekkes'
-                                   : 'Bruk reglene ved randomisering';
+                                   : 'Bruk reglene når plassene trekkes';
 }
