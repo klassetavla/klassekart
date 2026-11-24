@@ -1,12 +1,12 @@
 'use strict';
 
-import { LS_MAP, LS_LIST, LS_LAST, MAX_DESKS, MAX_NAME_LENGTH, MAX_IMPORT_BYTES } from './constants.js';
-import { state, replaceState, sanitizeState } from './state.js';
-import { renderAll, renderSavedMaps, renderSavedLists, renderMismatchWarning,
-         renderRuleList, updateStudentCount, updateDatalist } from './render.js';
-import { renderGroupsAll } from './groups-view.js';
+import { LS_MAP, LS_LIST, LS_LAST, MAX_IMPORT_BYTES } from './constants.js';
+import { state } from './state.js';
 import { showToast } from './toast.js';
-import { resetToBlankClass } from './ui.js';
+import { prepareChartForExport } from './render.js';
+import { LS_PREFIX, importClass, resetAfterWipe } from './classes.js';
+
+// Files and wiping. Saving and loading classes lives in classes.js.
 
 const $ = id => document.getElementById(id);
 
@@ -15,123 +15,23 @@ export function safeName(name) {
   return (name || 'Uten navn').replace(/[^\w æøåÆØÅ-]/g, '').trim() || 'Uten navn';
 }
 
-// ── Saved seating charts ─────────────────────────────────
-export function saveToLocalStorage() {
-  const name = safeName(state.className);
-  if (LS_MAP + name === LS_LAST) {
-    showToast('«last» er et reservert navn — gi klassen et annet navn');
-    return;
-  }
-  // safeName strips punctuation, so "7A", "7A!" and "7.A" all collapse to the
-  // same key. Saving used to overwrite the older chart without a word.
-  if (localStorage.getItem(LS_MAP + name) !== null &&
-      !confirm(`Det finnes allerede et kart som heter "${name}". Overskrive det?`)) {
-    return;
-  }
-  try {
-    localStorage.setItem(LS_MAP + name, JSON.stringify(state));
-    renderSavedMaps();
-    $('saved-maps').value = name;
-    showToast(`Lagret som "${name}"`);
-  } catch {
-    showToast('Feil ved lagring — nettleserens lagringsplass kan være full');
-  }
-}
-
-export function loadFromLocalStorage() {
-  const name = $('saved-maps').value;
-  if (!name) { showToast('Velg et lagret kart først'); return; }
-  try {
-    const raw = localStorage.getItem(LS_MAP + name);
-    if (!raw) { showToast(`Fant ikke "${name}"`); return; }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed?.desks)) { showToast('Ugyldig data'); return; }
-    replaceState(sanitizeState(parsed));
-    renderAll();
-    showToast(`Lastet inn "${name}"`);
-  } catch {
-    showToast('Feil ved innlasting');
-  }
-}
-
-export function deleteFromLocalStorage() {
-  const name = $('saved-maps').value;
-  if (!name) { showToast('Velg et kart å slette'); return; }
-  if (!confirm(`Slette "${name}"?`)) return;
-  localStorage.removeItem(LS_MAP + name);
-  renderSavedMaps();
-  showToast(`"${name}" slettet`);
-}
-
 export function clearAllData() {
-  if (!confirm('Dette sletter alle lagrede kart, elevlister og siste økt permanent.\nEr du sikker?')) return;
-  const doomed = Object.keys(localStorage)
-    .filter(k => k.startsWith(LS_MAP) || k.startsWith(LS_LIST) || k === LS_LAST);
-  doomed.forEach(k => localStorage.removeItem(k));
-  // The names are still in memory, and pagehide would write them straight back
-  // as the session. Clear the screen too, so «slettet» really means deleted.
-  resetToBlankClass();
-  renderSavedMaps();
-  renderSavedLists();
-  showToast(`${doomed.length} element(er) slettet fra nettleseren`);
-}
-
-// ── Saved student lists ──────────────────────────────────
-export function saveList() {
-  const name = $('list-name-input').value.trim();
-  if (!name) { showToast('Skriv et listenavn'); return; }
-  if (state.students.length === 0) { showToast('Ingen elever å lagre'); return; }
-  if (localStorage.getItem(LS_LIST + name) !== null &&
-      !confirm(`Det finnes allerede en liste som heter "${name}". Overskrive den?`)) {
-    return;
-  }
+  if (!confirm('Dette sletter alle klassene dine (elevlister, regler, kart og grupper) fra denne nettleseren permanent.\nEr du sikker?')) return;
+  let doomed = [];
   try {
-    localStorage.setItem(LS_LIST + name, JSON.stringify(state.students));
-  } catch {
-    showToast('Feil ved lagring av liste');
-    return;
-  }
-  renderSavedLists();
-  $('saved-lists').value = name;
-  showToast(`Liste "${name}" lagret`);
-}
-
-export function loadList() {
-  const name = $('saved-lists').value;
-  if (!name) { showToast('Velg en liste'); return; }
-  try {
-    const raw = localStorage.getItem(LS_LIST + name);
-    if (!raw) { showToast(`Fant ikke "${name}"`); return; }
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) { showToast('Ugyldig liste'); return; }
-
-    state.students = [...new Set(
-      parsed.filter(s => typeof s === 'string').map(s => s.trim().slice(0, MAX_NAME_LENGTH)).filter(Boolean)
-    )].slice(0, MAX_DESKS);
-
-    $('students-textarea').value  = state.students.join('\n');
-    $('list-name-input').value    = name;
-    updateStudentCount();
-    updateDatalist();
-    renderMismatchWarning();
-    renderRuleList();
-    renderGroupsAll();
-    showToast(`Liste "${name}" lastet inn`);
-  } catch {
-    showToast('Feil ved innlasting av liste');
-  }
-}
-
-export function deleteList() {
-  const name = $('saved-lists').value;
-  if (!name) { showToast('Velg en liste å slette'); return; }
-  if (!confirm(`Slette listen "${name}"?`)) return;
-  localStorage.removeItem(LS_LIST + name);
-  renderSavedLists();
-  showToast(`Liste "${name}" slettet`);
+    doomed = Object.keys(localStorage)
+      .filter(k => k.startsWith(LS_PREFIX) || k.startsWith(LS_MAP) || k.startsWith(LS_LIST) || k === LS_LAST);
+    doomed.forEach(k => localStorage.removeItem(k));
+  } catch { /* storage blocked — nothing stored either */ }
+  // The names are still in memory and would be written straight back on the
+  // next autosave. Clear the screen too, so «slettet» really means deleted.
+  resetAfterWipe();
+  showToast('All lokal data er slettet fra nettleseren');
 }
 
 // ── JSON file export / import ────────────────────────────
+// The file is the class's state — the same shape older versions exported, so
+// files go both ways between old and new versions.
 export function exportJSON() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -141,24 +41,28 @@ export function exportJSON() {
   a.click();
   // Revoking synchronously can cancel the download in some browsers.
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
+  showToast('Klassen er lastet ned som fil — åpne den med «Hent klasse fra fil» på en annen PC');
 }
 
 export function importJSON(file) {
-  if (file.size > MAX_IMPORT_BYTES) { showToast('Filen er for stor til å være et klassekart'); return; }
+  if (file.size > MAX_IMPORT_BYTES) { showToast('Filen er for stor til å være en klasse'); return; }
   const reader = new FileReader();
   reader.onerror = () => showToast('Kunne ikke lese filen');
   reader.onload = e => {
+    let parsed;
     try {
-      const parsed = JSON.parse(e.target.result);
-      if (!Array.isArray(parsed?.desks)) { showToast('Ugyldig JSON-fil'); return; }
-      // Imported files are shared between machines and hand-editable, so they
-      // go through the same clamping as everything else.
-      replaceState(sanitizeState(parsed));
-      renderAll();
-      showToast('Importert!');
+      parsed = JSON.parse(e.target.result);
     } catch {
-      showToast('Feil ved import');
+      showToast('Filen er ikke en klasse fra Klassetavla');
+      return;
     }
+    // Imported files are shared between machines and hand-editable, so they
+    // go through the same clamping as everything else (in importClass).
+    if (!parsed || typeof parsed !== 'object' || !Array.isArray(parsed.desks)) {
+      showToast('Filen er ikke en klasse fra Klassetavla');
+      return;
+    }
+    importClass(parsed, file.name || '');
   };
   reader.readAsText(file);
 }
@@ -180,6 +84,8 @@ export async function exportPNG() {
     ${state.hideEmptyDesksOnPrint ? '.desk-empty { visibility: hidden !important; }' : ''}
   `;
   document.head.appendChild(overrides);
+  // Full size, no on-screen zoom, no empty grid cells — as on paper.
+  const restore = prepareChartForExport();
 
   try {
     const canvas = await html2canvas($('classroom'), {
@@ -195,25 +101,7 @@ export async function exportPNG() {
   } catch {
     showToast('Kunne ikke eksportere bilde');
   } finally {
+    restore();
     overrides.remove();
-  }
-}
-
-// ── Session continuity ───────────────────────────────────
-export function saveSession() {
-  try { localStorage.setItem(LS_LAST, JSON.stringify(state)); } catch { /* quota — ignore */ }
-}
-
-/** Returns true when a previous session was restored. */
-export function restoreSession() {
-  try {
-    const raw = localStorage.getItem(LS_LAST);
-    if (!raw) return false;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed?.desks) || parsed.desks.length === 0) return false;
-    replaceState(sanitizeState(parsed));
-    return true;
-  } catch {
-    return false;
   }
 }

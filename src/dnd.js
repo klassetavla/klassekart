@@ -3,7 +3,7 @@
 import { MIN_BB_SIZE } from './constants.js';
 import { state, pushUndo } from './state.js';
 import {
-  renderClassroom, syncBlackboard, defaultBlackboardInset, blackboardTrackLength
+  renderClassroom, syncBlackboard, defaultBlackboardInset, blackboardTrackLength, screenZoom
 } from './render.js';
 import { moveDesk, swapRegularDesks, swapWithTeacher } from './desks.js';
 
@@ -112,9 +112,12 @@ export function initBlackboardResize() {
     const track    = blackboardTrackLength();
     const startPos = isHoriz ? e.clientX : e.clientY;
     const startVal = isBefore ? state.blackboardInset.before : state.blackboardInset.after;
+    // The chart may be zoomed to fit the window; mouse movement is in screen
+    // pixels, the inset in chart pixels.
+    const zoom     = screenZoom();
 
     function onMove(ev) {
-      const delta    = (isHoriz ? ev.clientX : ev.clientY) - startPos;
+      const delta    = ((isHoriz ? ev.clientX : ev.clientY) - startPos) / zoom;
       const adjusted = isBefore ? delta : -delta;
       const other    = isBefore ? state.blackboardInset.after : state.blackboardInset.before;
       const maxInset = Math.max(0, track - MIN_BB_SIZE - other);
