@@ -3,19 +3,22 @@
 import {
   MIN_GROUP_SIZE, MAX_GROUP_SIZE, MIN_GROUP_COUNT, MAX_GROUP_COUNT,
   MAX_GROUP_HISTORY, MAX_ROLES, MAX_ROLE_LENGTH, ROLE_SUGGESTIONS
-} from './constants.js';
-import { state, pushUndo, detectDuplicates } from './state.js';
+} from './constants.js?v=28';
+import { state, pushUndo, detectDuplicates } from './state.js?v=28';
 import {
   todayKey, absentToday, presentStudents, groupSizes, describeSizes, drawGroups,
   brokenGroupRules, pastGroupings, buildResult, fillRoles, moveMember, resultDiff,
   groupsAsText
-} from './groups.js';
-import { showToast } from './toast.js';
-import { renderRuleList } from './rules-view.js';
+} from './groups.js?v=28';
+import { showToast } from './toast.js?v=28';
+import { renderRuleList } from './rules-view.js?v=28';
+import { syncBridgeButtons } from './bridges.js?v=28';
+import { renderActivitiesAll } from './activities-view.js?v=28';
+import { renderClassroom, renderMismatchWarning } from './render.js?v=28';
 
 // Everything on screen for the group tool: the settings panel, the group cards,
-// and tavlemodus. Deliberately independent of render.js — render.js calls in
-// here, never the other way round.
+// and tavlemodus. Also today's absence list in the left panel, which every tool
+// uses — that is the one place this calls back into the chart and the games.
 //
 // The group view is meant to be shown to the class, so it says nothing lasting
 // about rules — no names, no counts. Which rule is broken is only shown inside
@@ -125,7 +128,15 @@ function toggleAbsent(name) {
   const i = g.absent.names.indexOf(name);
   if (i === -1) g.absent.names.push(name);
   else g.absent.names.splice(i, 1);
+  renderAbsenceEverywhere();
+}
+
+/** Absence is shared: the chart dims the desk, teams and groups leave them out. */
+function renderAbsenceEverywhere() {
   renderGroupsAll();
+  renderActivitiesAll();
+  renderClassroom();
+  renderMismatchWarning();
 }
 
 function forgetHistory() {
@@ -176,6 +187,9 @@ function renderPanel() {
   });
   $('grp-stepper-label').textContent = bySize ? 'Elever per gruppe' : 'Antall grupper';
   $('grp-val').textContent           = bySize ? g.size : g.count;
+  // Before the first draw the same line stands under the big button in the
+  // middle; saying it twice side by side only adds noise.
+  $('grp-preview').hidden            = !g.result;
   $('grp-preview').textContent       = present.length < 2
     ? 'Legg inn minst to elever'
     : '→ ' + describeSizes(groupSizes(present.length, g));
@@ -306,7 +320,7 @@ function renderView() {
     if (added.length)   parts.push('ikke i noen gruppe: ' + added.join(', '));
     if (removed.length) parts.push('ikke med lenger: ' + removed.join(', '));
     addNotice(notice, 'warn', 'Elevlisten er endret siden trekningen — ' + parts.join(' · '), true);
-  } else if (sizesNow.length !== res.groups.length) {
+  } else if (!res.fromChart && sizesNow.length !== res.groups.length) {
     addNotice(notice, 'warn', `Inndelingen er endret til ${describeSizes(sizesNow).split(' —')[0]}.`, true);
   }
 
@@ -615,6 +629,7 @@ export function renderGroupsAll() {
   renderPanel();
   renderView();
   renderRuleList();
+  syncBridgeButtons();
   if (boardOpen && !dealing) renderBoard();
 }
 
@@ -631,7 +646,7 @@ export function initGroups() {
 
   $('grp-absent-toggle').addEventListener('change', e => {
     state.groups.trackAbsence = e.target.checked;
-    renderGroupsAll();
+    renderAbsenceEverywhere();
   });
   $('grp-absent-chips').addEventListener('click', e => {
     const chip = e.target.closest('[data-grp-absent]');
@@ -669,6 +684,7 @@ export function initGroups() {
 
   // Group cards
   $('btn-draw-empty').addEventListener('click', drawGroupsNow);
+  $('btn-redraw-groups').addEventListener('click', drawGroupsNow);
   $('btn-board-empty').addEventListener('click', openBoard);
   $('groups-notice').addEventListener('click', e => {
     if (e.target.closest('[data-grp-draw]')) drawGroupsNow();

@@ -1,6 +1,6 @@
 'use strict';
 
-import { shuffle } from './shuffle.js';
+import { shuffle } from './shuffle.js?v=28';
 
 // Pure group logic: sizes, the draw itself, roles, history and text export.
 // No DOM and no live state — every function works on the values it is given.
@@ -43,10 +43,10 @@ export function groupSizes(n, g) {
 }
 
 /** "7 grupper — 5 med 4 elever, 2 med 3" */
-export function describeSizes(sizes) {
+export function describeSizes(sizes, noun = ['gruppe', 'grupper']) {
   if (sizes.length === 0) return 'Ingen elever å fordele';
   const k    = sizes.length;
-  const head = `${k} gruppe${k === 1 ? '' : 'r'}`;
+  const head = `${k} ${k === 1 ? noun[0] : noun[1]}`;
   const counts = new Map();
   sizes.forEach(s => counts.set(s, (counts.get(s) || 0) + 1));
   if (counts.size === 1) return `${head} med ${sizes[0]} elev${sizes[0] === 1 ? '' : 'er'}`;

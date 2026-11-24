@@ -1,13 +1,13 @@
 'use strict';
 
-import { MIN_GRID, MAX_GRID } from './constants.js';
+import { MIN_GRID, MAX_GRID } from './constants.js?v=28';
 import {
   state, pushUndo, isFreeDesk, freeDesks, studentsWithoutDesk,
   deskCells, deskAt, setMoveMode
-} from './state.js';
-import { computeLayout, calcRequiredRows } from './layout.js';
-import { renderAll, renderClassroom, renderMismatchWarning, updateGridDisplay } from './render.js';
-import { showToast } from './toast.js';
+} from './state.js?v=28';
+import { computeLayout, calcRequiredRows } from './layout.js?v=28';
+import { renderAll, renderClassroom, renderMismatchWarning, updateGridDisplay } from './render.js?v=28';
+import { showToast } from './toast.js?v=28';
 
 const $ = id => document.getElementById(id);
 
@@ -77,8 +77,9 @@ export function rebuildDesks(preserveNames) {
 
   narrowUnfittableDesks();
 
-  // Grow the grid if the layout needs more room than it currently has.
-  const needed = calcRequiredRows(state.deskCount, state.groupSize, state.gridCols) + 1;
+  // Grow the grid if the layout needs more room than it currently has. No
+  // spare row at the back: an empty row there is just wasted paper.
+  const needed = calcRequiredRows(state.deskCount, state.groupSize, state.gridCols);
   if (state.gridRows < needed) {
     state.gridRows = Math.min(MAX_GRID, needed);
     updateGridDisplay();
@@ -125,8 +126,13 @@ export function fixMissingDesks() {
   pushUndo();
 
   // Only genuinely free desks may be filled — a desk the teacher marked as
-  // "skal stå tom" must stay empty.
-  const targets = freeDesks();
+  // "skal stå tom" must stay empty. A desk still holding someone who has been
+  // taken off the student list counts as free too, and goes first: that seat
+  // was in use, and the old name shouldn't be left standing next to new ones.
+  const inList  = new Set(state.students);
+  const stale   = state.desks.filter(d =>
+    d.studentName && !inList.has(d.studentName) && !d.locked && !d.marked);
+  const targets = [...stale, ...freeDesks()];
   unassigned.slice(0, targets.length).forEach((name, i) => { targets[i].studentName = name; });
 
   const toPlace = unassigned.slice(targets.length);
@@ -255,6 +261,11 @@ export function exitMoveMode() {
 }
 
 // ── Teacher desk ─────────────────────────────────────────
+/** Puts the teacher desk by the board, making room for it. */
+export function placeTeacherDesk() {
+  addTeacherDesk();
+}
+
 function addTeacherDesk() {
   const pos       = state.blackboardPosition || 'top';
   const centerCol = Math.ceil(state.gridCols / 2);
@@ -309,7 +320,7 @@ function removeTeacherDesk() {
 }
 
 export function toggleTeacherDesk() {
-  pushUndo();
+  pushUndo({ layout: false });
   if (state.teacherDesk) removeTeacherDesk();
   else addTeacherDesk();
   syncTeacherButton();
@@ -317,7 +328,7 @@ export function toggleTeacherDesk() {
 }
 
 export function clearTeacherDesk() {
-  pushUndo();
+  pushUndo({ layout: false });
   removeTeacherDesk();
   syncTeacherButton();
   renderClassroom();

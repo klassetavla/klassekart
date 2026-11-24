@@ -1,31 +1,29 @@
 'use strict';
 
-import { MAX_DESKS, MAX_NAME_LENGTH } from './constants.js';
+import { MAX_DESKS, MAX_NAME_LENGTH } from './constants.js?v=28';
 import {
-  state, replaceState, createInitialState, pushUndo, popUndo, clearUndo,
-  getMoveMode, setMoveMode, renameStudentRefs
-} from './state.js';
+  state, pushUndo, popUndo, getMoveMode, renameStudentRefs, dropRemovedStudents
+} from './state.js?v=28';
 import {
   renderAll, renderClassroom, renderMismatchWarning, renderStatsBanner,
   renderRuleList, syncBlackboard, deskFontSize,
   updateStudentCount, updateDatalist
-} from './render.js';
-import { renderGroupsAll } from './groups-view.js';
+} from './render.js?v=28';
+import { renderGroupsAll } from './groups-view.js?v=28';
+import { renderActivitiesAll } from './activities-view.js?v=28';
 import {
   fixMissingDesks, removeExcessDesks, deleteAxis, moveAxis,
-  enterMoveMode, exitMoveMode, rebuildDesks, toggleDeskWidth, clearTeacherDesk
-} from './desks.js';
-import { showToast } from './toast.js';
+  enterMoveMode, exitMoveMode, toggleDeskWidth, clearTeacherDesk
+} from './desks.js?v=28';
+import { showToast } from './toast.js?v=28';
 
 const $ = id => document.getElementById(id);
 
 // ── Undo ─────────────────────────────────────────────────
 export function undo() {
-  // The undo stack is shared by both tools. Switching tabs is not an edit, so
-  // an undo must not yank the teacher back to the tab they were on before.
-  const mode = state.mode;
-  if (!popUndo()) { showToast('Ingenting å angre'); return; }
-  state.mode = mode;
+  // Each tab has its own steps (see pushUndo), so this only ever rolls back
+  // something in the tab that is showing.
+  if (!popUndo()) { showToast('Ingenting å angre her'); return; }
   renderAll();
   showToast('Angret');
 }
@@ -148,7 +146,8 @@ export function startInlineEdit(deskEl, deskObj) {
 
     // Only now is there something worth undoing. Pushing on edit *start* meant
     // opening an editor and pressing Escape still consumed an undo step.
-    pushUndo();
+    // A rename reaches the list, rules, groups and teams, so all of it.
+    pushUndo({ all: true });
 
     if (oldName) {
       const idx = state.students.indexOf(oldName);
@@ -174,6 +173,7 @@ export function startInlineEdit(deskEl, deskObj) {
     renderMismatchWarning();
     renderRuleList();
     renderGroupsAll();
+    renderActivitiesAll();
   }
 
   function cancel() {
@@ -224,7 +224,19 @@ function initDelegatedActions() {
     const { action, axis, index } = el.dataset;
 
     switch (action) {
+      case 'undo':       undo(); break;
       case 'fix-desks':  fixMissingDesks(); break;
+
+      case 'remove-stale': {
+        pushUndo({ all: true });
+        const n = dropRemovedStudents();
+        renderClassroom();
+        renderMismatchWarning();
+        renderGroupsAll();
+        renderActivitiesAll();
+        showToast(n === 1 ? 'Én pult er tømt' : `${n} pulter er tømt`);
+        break;
+      }
       case 'trim-desks': removeExcessDesks(); break;
 
       case 'delete-axis':
@@ -263,25 +275,6 @@ function initDelegatedActions() {
   });
 }
 
-// ── New class ────────────────────────────────────────────
-export function newClass() {
-  if (!confirm('Start ny klasse? Alt som ikke er lagret vil gå tapt.')) return;
-  resetToBlankClass();
-  showToast('Ny klasse opprettet');
-}
-
-/** Empty chart in the current mode, with no undo history to bring names back. */
-export function resetToBlankClass() {
-  const mode = state.mode;
-  replaceState(createInitialState());
-  state.mode = mode;
-  clearUndo();
-  setMoveMode(null);
-  hideContextMenu();
-  rebuildDesks(false);
-  renderAll();
-}
-
 // ── Clipboard ────────────────────────────────────────────
 export async function pasteFromClipboard() {
   let text;
@@ -312,6 +305,7 @@ export async function pasteFromClipboard() {
   renderMismatchWarning();
   renderRuleList();
   renderGroupsAll();
+  renderActivitiesAll();
   showToast(added > 0 ? `${added} navn lagt til` : 'Ingen nye navn funnet');
 }
 

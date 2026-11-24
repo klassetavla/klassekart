@@ -1,11 +1,11 @@
 'use strict';
 
-import { shuffle } from './shuffle.js';
-import { plainTextLine } from './groups.js';
+import { shuffle } from './shuffle.js?v=28';
+import { plainTextLine } from './groups.js?v=28';
 import {
   CATEGORY_BANK, CLASSIC_CATEGORIES, EASY_LETTERS, HARD_LETTERS,
   MAX_CATEGORIES, MAX_CAT_LENGTH, MAX_POINTS, MAX_PENALTY
-} from './constants.js';
+} from './constants.js?v=28';
 
 // Pure logic for aktivitetene: letters, categories, scoring and standings.
 // No DOM and no live state — every function works on the values it is given,

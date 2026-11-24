@@ -5,6 +5,9 @@ export const CELL_SIZE   = 80;
 export const CELL_GAP    = 8;
 export const CELL_STRIDE = CELL_SIZE + CELL_GAP; // 88px per cell slot
 export const CTRL_SIZE   = 28; // row-controls width = col-controls height (fixed in CSS)
+// Rows and columns with no desk in them (the walkways) are drawn this narrow
+// instead of a full desk's width, so the chart is compact on screen and paper.
+export const AISLE_SIZE  = 28;
 export const BB_MARGIN   = 12; // equal visible margin on each side of grid cells (default)
 export const MIN_BB_SIZE = 40;
 
@@ -41,6 +44,21 @@ export const PRINT_HEADER_PX = 61;
 
 // Never shrink a chart into illegibility; below this we let it overflow instead.
 export const MIN_PRINT_ZOOM  = 0.35;
+
+// On screen the chart shrinks to fit the window, but not below this — under it
+// the names get too small to work with, so the wrapper scrolls instead.
+export const MIN_SCREEN_ZOOM = 0.55;
+// «Vis for klassen» may scale the chart up to fill a projector.
+export const MAX_PRESENT_ZOOM = 3;
+
+// Desk names: one font size for the whole chart, wrapped onto lines. The chart
+// size is the largest in this range at which every name fits on at most
+// NAME_MAX_LINES lines; names that still don't fit shrink on their own down to
+// NAME_MIN_PX. All three are multiplied by the text-size slider.
+export const NAME_MAX_PX    = 15;
+export const NAME_FLOOR_PX  = 11;
+export const NAME_MIN_PX    = 6;
+export const NAME_MAX_LINES = 3;
 
 // Scaling to the exact printable width leaves no room for rounding, and
 // browsers and printer drivers disagree slightly about the usable area. A

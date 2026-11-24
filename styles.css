@@ -110,18 +110,124 @@ body {
   letter-spacing: -0.02em;
   color: #111;
 }
-.btn-new-class {
+/* ── Lagringsstatus ───────────────────────────────────── */
+.save-status {
   flex-shrink: 0;
-  padding: 4px 8px;
   font-size: 11px;
+  color: #2f9e44;
+  white-space: nowrap;
+  cursor: default;
+}
+.save-status.save-error { color: #c33; font-weight: 600; }
+.save-flash { animation: save-flash 1.2s ease; }
+@keyframes save-flash {
+  0%   { opacity: 0.35; }
+  100% { opacity: 1; }
+}
+
+/* ── Klassevelger ─────────────────────────────────────── */
+.class-section { position: relative; }
+.class-bar { display: flex; }
+.class-switch {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
   background: #fff;
-  border: 1px solid #ddd;
-  border-radius: 4px;
+  border: 1px solid #ccc;
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: #111;
+  text-align: left;
   cursor: pointer;
-  color: #888;
+  transition: border-color 0.12s, background 0.12s;
+}
+.class-switch:hover { border-color: #888; background: #fafafa; }
+.class-switch[aria-expanded="true"] { border-color: #111; }
+.class-switch-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
-.btn-new-class:hover { background: #fff0f0; color: #c33; border-color: #c33; }
+.class-switch-name.class-unnamed { color: #999; font-weight: 600; font-style: italic; }
+.class-switch-caret { font-size: 12px; color: #888; }
+.class-name-input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  font-size: 16px;
+  font-weight: 700;
+  border: 1px solid #111;
+  border-radius: 7px;
+  font-family: inherit;
+}
+
+.class-menu {
+  position: absolute;
+  z-index: 8000;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.16);
+  padding: 4px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+.class-menu-list { display: flex; flex-direction: column; }
+.class-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 9px;
+  background: none;
+  border: none;
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #222;
+  text-align: left;
+  cursor: pointer;
+}
+.class-menu-item:hover,
+.class-menu-item:focus-visible { background: #f2f2f2; outline: none; }
+.class-menu-item.ctx-danger { color: #c33; }
+.class-menu-item.ctx-danger:hover { background: #fff0f0; }
+.class-menu-check { width: 14px; flex-shrink: 0; font-weight: 700; }
+.class-menu-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.class-menu-class[aria-checked="true"] .class-menu-name { font-weight: 700; }
+.class-menu-count { flex-shrink: 0; font-size: 11px; color: #999; }
+.class-menu-sep { height: 1px; background: #eee; margin: 4px 2px; }
+
+/* A lone option in the left panel: no divider lines around it. */
+.opt.opt-solo { padding: 0; border-bottom: none; }
+
+/* ── Verktøylinje over klassekartet / gruppene ────────── */
+.tool-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  max-width: 1100px;
+  margin: 0 auto 14px;
+}
+.tool-toolbar-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.btn-tool-main { padding: 7px 14px; font-size: 13.5px; font-weight: 600; }
+/* The counts get a line of their own under the buttons, so the two button
+   groups stay on one row on a 1366px screen with both panels open. */
+#seating-toolbar .stats-banner { order: 3; flex-basis: 100%; margin-top: -4px; }
+/* Same shape in Grupper: buttons on one row, the summary under them. */
+#groups-summary { order: 3; flex-basis: 100%; }
 
 .section {
   margin-bottom: 18px;
@@ -220,8 +326,6 @@ body {
 }
 .btn-sm { transition: background 0.12s, border-color 0.12s; }
 .btn-sm:hover { background: #f5f5f5; border-color: #999; }
-.btn-sm-danger { color: #c00; }
-.btn-sm-danger:hover { background: #fff0f0; border-color: #c00; }
 
 .rule-og { font-size: 11px; color: #888; flex-shrink: 0; }
 .mb-6 { margin-bottom: 6px; }
@@ -261,9 +365,6 @@ body {
 }
 
 /* Collapsible lists */
-.details-lists {
-  margin-top: 8px;
-}
 .details-summary {
   font-size: 11px;
   font-weight: 600;
@@ -388,16 +489,6 @@ details[open] .details-summary::before { transform: rotate(90deg); }
 .input-row input[type="number"]:focus,
 .input-row select:focus { outline: none; border-color: #888; }
 
-#saved-maps, #saved-lists {
-  width: 100%;
-  padding: 6px 8px;
-  border: 1px solid #d0d0d0;
-  border-radius: 5px;
-  font-size: 13px;
-  font-family: inherit;
-  background: #fff;
-}
-#saved-maps:focus, #saved-lists:focus { outline: none; border-color: #888; }
 
 /* Buttons */
 .btn-primary {
@@ -493,13 +584,6 @@ details[open] .details-summary::before { transform: rotate(90deg); }
   margin-bottom: 2px;
 }
 
-.sidebar-footer {
-  margin-top: auto;
-  padding-top: 16px;
-  font-size: 11px;
-  color: #bbb;
-  text-align: center;
-}
 kbd {
   background: #f0f0f0;
   border: 1px solid #ccc;
@@ -692,11 +776,12 @@ kbd {
 /* ── Grid ─────────────────────────────────────────────── */
 #grid-container { position: relative; }
 
+/* Cell sizes come from render.js: a full desk, or a narrow walkway. */
 .grid-cell {
   position: absolute;
   width: 80px;
   height: 80px;
-  border: 1px dashed #e2e2e2;
+  border: 1px dashed #e6e6e6;
   border-radius: 4px;
   z-index: 1;
   transition: background 0.08s, border-color 0.08s;
@@ -708,9 +793,9 @@ kbd {
 
 .group-bg {
   position: absolute;
-  background: #f5f5f5;
-  border: 1px solid #e4e4e4;
-  border-radius: 8px;
+  background: #f1f3f5;
+  border: 1px solid #e3e6e9;
+  border-radius: 9px;
   z-index: 2;
   pointer-events: none;
   -webkit-print-color-adjust: exact;
@@ -718,12 +803,19 @@ kbd {
 }
 
 /* ── Desks ────────────────────────────────────────────── */
+/* Light desk, dark text, and the table group's colour along the top edge
+   (--desk-color, set per desk in render.js). Names wrap onto lines at one
+   common size; padding, border, line-height and weight are mirrored in
+   render.js (DESK_PAD_*, NAME_LINE_H, NAME_WEIGHT) for the text fitting. */
 .desk {
+  --desk-color: #adb5bd;
   position: absolute;
   width: 80px;
   height: 80px;
-  background: #111;
-  color: #fff;
+  background: #fff;
+  color: #1a1a1a;
+  border: 1px solid #ced4da;
+  border-top: 5px solid var(--desk-color);
   border-radius: 7px;
   z-index: 3;
   cursor: grab;
@@ -731,17 +823,21 @@ kbd {
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-weight: 500;
-  line-height: 1.3;
-  padding: 7px;
+  font-weight: 600;
+  line-height: 1.18;
+  padding: 1px 5px 5px;
   user-select: none;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
   overflow: hidden;
-  transition: box-shadow 0.1s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.07);
+  transition: box-shadow 0.1s, opacity 0.15s;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
-.desk:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.28); }
+.desk:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.16); }
 .desk:active { cursor: grabbing; }
 .desk.dragging { opacity: 0.3; cursor: grabbing; }
 .desk.drag-over {
@@ -750,35 +846,70 @@ kbd {
   box-shadow: none;
 }
 
-/* Empty desk */
+/* Empty desk — a seat nobody sits at */
 .desk-empty {
-  background: transparent !important;
-  border: 2px dashed #ccc;
-  color: #bbb;
+  background: rgba(255,255,255,0.6) !important;
+  border: 2px dashed #ced4da;
+  border-top: 2px dashed #ced4da;
+  color: #adb5bd;
   box-shadow: none;
 }
-.desk-empty:hover { border-color: #aaa; box-shadow: none; }
+.desk-empty:hover { border-color: #999; box-shadow: none; }
 
-/* Wide desk (size 2) */
-.desk-wide { width: 168px; } /* 2*88 - 8 */
+/* Marked as «skal stå tom»: deliberately out of use */
+.desk-marked {
+  background: repeating-linear-gradient(-45deg, #f1f3f5 0 6px, #e9ecef 6px 12px);
+  border: 1px solid #ced4da;
+  border-top: 1px solid #ced4da;
+  box-shadow: none;
+}
 
-/* Locked desk indicator */
+/* Wide desk (size 2) — width is set in render.js */
+.desk-wide { width: 168px; }
+
+/* Locked desk: a pale tint and a lock in the corner */
+.desk-locked:not(.desk-empty):not(.desk-marked) { background: #f8f9fa; }
 .desk-locked::after {
   content: '🔒';
   position: absolute;
-  top: 3px;
-  right: 4px;
-  font-size: 8px;
+  top: 2px;
+  right: 3px;
+  font-size: 9px;
   line-height: 1;
-  opacity: 0.75;
+  opacity: 0.8;
+}
+
+/* Away today — screen only (print and PNG show the chart as it stands) */
+.desk-absent { opacity: 0.38; }
+.desk-absent::before {
+  content: 'borte';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 2px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #868e96;
+}
+
+/* Someone taken off the student list but still sitting here */
+.desk-stale {
+  background: #fff5f5 !important;
+  border: 2px dashed #e03131;
+  border-top: 2px dashed #e03131;
+  color: #a5a5a5;
+  text-decoration: line-through;
 }
 
 /* Teacher desk */
 .desk-teacher {
-  background: #3a5c3a !important;
+  background: #2f6b3a !important;
+  color: #fff;
+  border: none;
   font-size: 11px !important;
   font-weight: 700 !important;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   cursor: grab;
 }
 .desk-teacher:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.3); }
@@ -788,8 +919,8 @@ kbd {
   width: 100%;
   background: transparent;
   border: none;
-  border-bottom: 1px solid rgba(255,255,255,0.5);
-  color: #fff;
+  border-bottom: 1px solid #adb5bd;
+  color: #1a1a1a;
   font-size: inherit;
   font-family: inherit;
   font-weight: inherit;
@@ -798,7 +929,7 @@ kbd {
   padding: 0;
 }
 .desk-empty .desk-inline-input {
-  color: #777;
+  color: #555;
   border-bottom-color: #aaa;
 }
 
@@ -822,15 +953,95 @@ kbd {
 #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
 /* ── Stats banner ─────────────────────────────────────── */
+/* Sits in the chart toolbar, between the two button groups. */
 .stats-banner {
   display: none;
+  flex-wrap: wrap;
   font-size: 12px;
   color: #777;
-  padding-bottom: 10px;
-  gap: 14px;
+  gap: 4px 12px;
+  white-space: nowrap;
 }
 .stats-banner.visible { display: flex; justify-content: center; }
 .stats-banner span { display: inline-flex; align-items: center; gap: 3px; }
+
+/* Several rows in the chart warning (sidebar), e.g. removed students + free desks */
+#mismatch-warning .mm-row + .mm-row {
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid #ffe082;
+}
+.btn-stale-desks { background: #c92a2a !important; }
+.btn-stale-desks:hover { background: #a61e1e !important; }
+
+/* ── Chart zoom (screen) ──────────────────────────────── */
+/* --screen-zoom is set by fitChartToScreen() in render.js so the whole room
+   fits the window. Screen only: print has its own --print-zoom. */
+@media screen {
+  #classroom { zoom: var(--screen-zoom, 1); }
+}
+
+/* Narrow walkway rows/columns only need a delete button */
+.rc-aisle .ctrl-btn { padding: 1px 3px; }
+
+/* Image export (prepareChartForExport): the chart as it would print. The
+   export hides the row/column controls, so the board shifts with the grid. */
+#classroom.exporting { --ctrl-shift: -28px; }
+#classroom.exporting .grid-cell { visibility: hidden; }
+#classroom.exporting .desk-absent { opacity: 1; }
+#classroom.exporting .desk-absent::before { display: none; }
+
+/* ── Vis for klassen (present.js) ─────────────────────── */
+/* Same frame as the group tool's tavlemodus; the chart itself stays white so
+   names are easiest to read on a projector. */
+body.presenting #sidebar-left,
+body.presenting #sidebar-right,
+body.presenting .sidebar-tab,
+body.presenting #mode-tabs,
+body.presenting #seating-toolbar,
+body.presenting #row-controls,
+body.presenting #col-controls,
+body.presenting .bb-handle,
+body.presenting #bb-reset,
+body.presenting #context-menu { display: none !important; }
+
+body.presenting #classroom-wrapper {
+  background: #3b2a1e;
+  padding: 3vh 3vw;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+body.presenting #classroom {
+  /* Controls are hidden, so the grid moves left/up; the board follows. */
+  --ctrl-shift: -28px;
+  border-radius: 14px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.45);
+}
+body.presenting #grid-container { pointer-events: none; }
+body.presenting .grid-cell { visibility: hidden; }
+body.presenting .desk { cursor: default; box-shadow: none; }
+
+.present-close {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 9500;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.35);
+  background: rgba(0,0,0,0.35);
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s;
+}
+.present-close:hover,
+.present-close:focus-visible { opacity: 1; background: rgba(0,0,0,0.6); }
+@media print { .present-close { display: none !important; } }
 
 /* ── Row / Col controls ───────────────────────────────── */
 #grid-area {
@@ -1506,7 +1717,9 @@ button.act-card:hover {
   margin-bottom: 12px;
 }
 .act-panel-head h3 { font-size: 14px; font-weight: 700; }
-.act-panel-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.act-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.act-panel-actions .stepper { margin-right: 6px; }
+.act-inline-label { font-size: 12.5px; color: #666; }
 .act-muted { color: #999; font-weight: 400; }
 .act-hint  { margin-top: 10px; font-size: 12px; color: #888; line-height: 1.5; }
 
@@ -2194,14 +2407,16 @@ button.act-card:hover {
     print-color-adjust: exact;
   }
 
-  /* Hide drag helpers */
-  .grid-cell {
-    border: 1px dashed #eee;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .grid-cell.drag-over { background: transparent; border-style: dashed; }
+  /* The chart's toolbar is for the screen */
+  #seating-toolbar { display: none !important; }
+
+  /* Hide drag helpers — the empty grid is an editing aid, not part of the room */
+  .grid-cell { visibility: hidden !important; }
   .desk.dragging, .desk.drag-over { opacity: 1; outline: none; }
+  .desk { box-shadow: none !important; transition: none !important; }
+  /* Away today is a screen-only state; the printed chart is the seating plan */
+  .desk-absent { opacity: 1 !important; }
+  .desk-absent::before { display: none !important; }
 
   #mismatch-warning, #overflow-list, #toast { display: none !important; }
   #row-controls, #col-controls { display: none !important; }

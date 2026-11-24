@@ -9,14 +9,16 @@ import {
   DEFAULT_SECONDS, SECONDS_CHOICES, CLASSIC_CATEGORIES,
   VALID_PRINT_FORMATS, VALID_PRINT_ORIENTATIONS, VALID_BB_POSITIONS, VALID_GROUP_SIZES,
   VALID_MODES, VALID_RULE_TYPES, VALID_GROUP_SIZE_MODES, VALID_ACTIVITIES, VALID_GAME_PHASES
-} from './constants.js';
-import { normalizeCategories, letterPool, defaultTeamName } from './activities.js';
+} from './constants.js?v=28';
+import { normalizeCategories, letterPool, defaultTeamName } from './activities.js?v=28';
+import { CELL_STRIDE, CELL_GAP, CTRL_SIZE } from './constants.js?v=28';
+import { chartTracks } from './layout.js?v=28';
 
 // ── State shape ──────────────────────────────────────────
 // desks: [{id, col, row, groupId, studentName, locked, marked, size}]
 export function createInitialState() {
   return {
-    version:               2,
+    version:               3,
     mode:                  'seating', // 'seating' (klassekart) | 'groups' | 'activities'
     className:             '',
     students:              [],
@@ -102,27 +104,60 @@ export const getMoveMode = () => moveMode;
 export const setMoveMode = mode => { moveMode = mode; };
 
 // ── Undo ─────────────────────────────────────────────────
-const undoStack = [];
+// One stack per tool, and each step only remembers — and restores — the part
+// of the state that tool owns. A single shared stack meant «Angre» in Grupper
+// could quietly roll back a randomisation in the seating chart.
+const SCOPE_KEYS = {
+  seating: [
+    'desks', 'deskCount', 'groupSize', 'gridCols', 'gridRows', 'teacherDesk',
+    'hasRandomized', 'blackboardPosition', 'blackboardInset'
+  ],
+  groups:     ['groups'],
+  activities: ['activities']
+};
+// For edits that reach across tools, such as renaming a student or dropping
+// removed students from every tool. Settings that only change on purpose — the
+// class name, text size, print options — are left out, so undoing a rename
+// never also reverts them.
+const ALL_KEYS = [...SCOPE_KEYS.seating, 'students', 'rules', 'groups', 'activities'];
+
+const undoStacks = { seating: [], groups: [], activities: [] };
 
 function deepClone(obj) {
   return structuredClone(obj);
 }
 
-export function pushUndo() {
-  undoStack.push(deepClone(state));
-  if (undoStack.length > MAX_UNDO) undoStack.shift();
+/**
+ * Remembers the current state for «Angre» in the tab that is showing.
+ * opts.all:    snapshot every tool, for edits that change more than this tab.
+ * opts.layout: false for chart edits that don't arrange the desks (the teacher
+ *              desk), so the first draw still lays the room out by itself.
+ */
+export function pushUndo(opts = {}) {
+  const stack = undoStacks[state.mode] || undoStacks.seating;
+  const keys  = opts.all ? ALL_KEYS : (SCOPE_KEYS[state.mode] || SCOPE_KEYS.seating);
+  const snapshot = {};
+  keys.forEach(k => { snapshot[k] = deepClone(state[k]); });
+  stack.push({ keys, snapshot });
+  if (stack.length > MAX_UNDO) stack.shift();
+  // Any edit made in the chart (a drag, a lock, placing students…) makes the
+  // layout the teacher's own: the next draw must not replace it with an
+  // automatic one. Undo puts the old value back with the snapshot.
+  if (state.mode === 'seating' && !opts.all && opts.layout !== false) state.hasRandomized = true;
 }
 
-/** Pops one step. Returns false when there was nothing to undo, so the caller
- *  can decide what to tell the user (and skip the re-render). */
+/** Pops one step for the current tab. Returns false when there was nothing to
+ *  undo, so the caller can decide what to tell the user (and skip the re-render). */
 export function popUndo() {
-  if (undoStack.length === 0) return false;
-  replaceState(undoStack.pop());
+  const stack = undoStacks[state.mode] || undoStacks.seating;
+  if (stack.length === 0) return false;
+  const { keys, snapshot } = stack.pop();
+  keys.forEach(k => { state[k] = snapshot[k]; });
   return true;
 }
 
 export function clearUndo() {
-  undoStack.length = 0;
+  Object.values(undoStacks).forEach(s => { s.length = 0; });
 }
 
 // ── Desk predicates ──────────────────────────────────────
@@ -182,6 +217,44 @@ export function renameStudentRefs(oldName, newName) {
   state.activities.mariusleken.teams.forEach(team => {
     team.members = team.members.map(n => (n === oldName ? newName : n));
   });
+}
+
+/**
+ * The student list is the source of truth: anyone no longer on it is taken off
+ * their desk, out of the current groups and teams, and off today's absence
+ * list. Rules are left alone — they do no harm, and come back into force if
+ * the student is added again. Returns how many desks were cleared.
+ */
+export function dropRemovedStudents() {
+  const keep = new Set(state.students);
+  let desks = 0;
+  state.desks.forEach(d => {
+    if (d.studentName && !keep.has(d.studentName)) {
+      d.studentName = null;
+      // A lock means «this student keeps this seat»; the student is gone.
+      d.locked = false;
+      desks++;
+    }
+  });
+
+  const g = state.groups;
+  g.absent.names = g.absent.names.filter(n => keep.has(n));
+  g.result?.groups.forEach(grp => { grp.members = grp.members.filter(m => keep.has(m.name)); });
+
+  state.activities.mariusleken.teams.forEach(team => {
+    team.members = team.members.filter(n => keep.has(n));
+  });
+  return desks;
+}
+
+/** Whether anything outside the student list still names a removed student. */
+export function hasRemovedStudents() {
+  const keep = new Set(state.students);
+  const gone = n => n && !keep.has(n);
+  return state.desks.some(d => gone(d.studentName)) ||
+    state.groups.absent.names.some(gone) ||
+    !!state.groups.result?.groups.some(grp => grp.members.some(m => gone(m.name))) ||
+    state.activities.mariusleken.teams.some(t => t.members.some(gone));
 }
 
 /** Names appearing more than once, in first-seen order. */
@@ -298,7 +371,11 @@ function sanitizeGroups(g) {
     }));
     // Empty groups are kept on purpose: a group emptied by dragging stays as a
     // card to drag students back into.
-    if (groups.length > 0) next.result = { date: asDate(res.date), groups };
+    if (groups.length > 0) {
+      next.result = { date: asDate(res.date), groups };
+      // Taken from who sits together in the chart, not drawn by size.
+      if (res.fromChart === true) next.result.fromChart = true;
+    }
   }
 
   return next;
@@ -497,9 +574,29 @@ export function sanitizeState(parsed) {
     next.blackboardInset = (before === 0 && after === 0) ? null : { before, after };
   }
 
+  // Before version 3 every row and column was a full desk wide. Now empty ones
+  // are narrow aisles, so a board the teacher had resized is scaled by how much
+  // the desk grid shrank — same proportions, not the same pixels.
+  if (next.blackboardInset && !(Number(parsed.version) >= 3)) {
+    const horiz = next.blackboardPosition === 'top' || next.blackboardPosition === 'bottom';
+    const n     = horiz ? next.gridCols : next.gridRows;
+    const oldGrid = n * CELL_STRIDE - CELL_GAP;
+    const t       = chartTracks(next.desks, next.teacherDesk, next.gridCols, next.gridRows);
+    const newGrid = (horiz ? t.cols : t.rows).length;
+    if (oldGrid > 0 && newGrid > 0 && newGrid < oldGrid) {
+      const k = newGrid / oldGrid;
+      const { before, after } = next.blackboardInset;
+      next.blackboardInset = {
+        before: Math.round(Math.min(before, CTRL_SIZE) + Math.max(0, before - CTRL_SIZE) * k),
+        after:  Math.round(after * k)
+      };
+    }
+  }
+
   // A restored chart already has a layout; auto-layout must not overwrite it
-  // on the next randomise.
-  next.hasRandomized = true;
+  // on the next randomise. Only classes saved by this version (3+) can say
+  // they were never drawn — older files always meant «keep my layout».
+  next.hasRandomized = !(Number(parsed.version) >= 3 && parsed.hasRandomized === false);
 
   return next;
 }

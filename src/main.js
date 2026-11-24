@@ -2,56 +2,64 @@
 
 import {
   MAX_GRID, MAX_DESK_COUNT, MAX_DESKS, MAX_NAME_LENGTH, MIN_TEXT_SCALE, MAX_TEXT_SCALE, MAX_RULES
-} from './constants.js';
-import { state, pushUndo, getMoveMode, renameStudentRefs } from './state.js';
-import { computeAutoLayout } from './layout.js';
+} from './constants.js?v=28';
+import {
+  state, pushUndo, getMoveMode, renameStudentRefs, dropRemovedStudents, hasRemovedStudents,
+  createInitialState
+} from './state.js?v=28';
+import { computeAutoLayout } from './layout.js?v=28';
 import {
   renderAll, renderClassroom, renderMismatchWarning, updateGridDisplay,
   updatePrintPageStyle, updatePrintHeader, updateStudentCount, updateDatalist,
-  refreshDeskFontSizes, renderRuleList, syncDupWarning, deskFontSize,
-  updatePrintScale
-} from './render.js';
-import { rebuildDesks, toggleTeacherDesk, nudgeGrid, exitMoveMode } from './desks.js';
-import { randomizeSeating } from './randomize.js';
-import { initGroups, renderGroupsAll, drawGroupsNow } from './groups-view.js';
-import { initActivities, renderActivitiesAll, drawTeamsNow } from './activities-view.js';
-import { initDragAndDrop, initBlackboardResize } from './dnd.js';
-import {
-  saveToLocalStorage, loadFromLocalStorage, deleteFromLocalStorage, clearAllData,
-  saveList, loadList, deleteList, exportJSON, importJSON, exportPNG,
-  saveSession, restoreSession
-} from './storage.js';
-import { initUI, undo, newClass, pasteFromClipboard, hideContextMenu } from './ui.js';
-import { showToast, hideToast } from './toast.js';
+  refreshDeskFontSizes, renderRuleList, syncDupWarning, updatePrintScale
+} from './render.js?v=28';
+import { rebuildDesks, toggleTeacherDesk, placeTeacherDesk, nudgeGrid, exitMoveMode } from './desks.js?v=28';
+import { randomizeSeating } from './randomize.js?v=28';
+import { initGroups, renderGroupsAll } from './groups-view.js?v=28';
+import { initActivities, renderActivitiesAll } from './activities-view.js?v=28';
+import { initDragAndDrop, initBlackboardResize } from './dnd.js?v=28';
+import { clearAllData, exportJSON, importJSON, exportPNG } from './storage.js?v=28';
+import { initClasses } from './classes.js?v=28';
+import { initBridges } from './bridges.js?v=28';
+import { initUI, undo, pasteFromClipboard, hideContextMenu } from './ui.js?v=28';
+import { showToast, hideToast } from './toast.js?v=28';
+import { initPresentMode } from './present.js?v=28';
 
 const $ = id => document.getElementById(id);
 
 // ── Randomize ────────────────────────────────────────────
 function handleRandomize() {
-  if (state.mode === 'groups') {
-    syncDupWarning();
-    drawGroupsNow();
-    return;
-  }
-  if (state.mode === 'activities') {
-    syncDupWarning();
-    drawTeamsNow();
-    return;
-  }
   if (syncDupWarning().length > 0) {
     showToast('Fjern duplikatnavn først');
     return;
   }
+  // Read before pushUndo, which marks the layout as the teacher's own.
+  const firstDraw = !state.hasRandomized;
   pushUndo();
 
   // The first randomisation also picks a sensible grid; later ones respect
   // whatever layout the teacher has arranged by hand.
-  if (!state.hasRandomized) {
+  if (firstDraw) {
+    // One desk per student — 25 students and the default 24 desks used to
+    // leave someone standing after the very first draw, and 3 students got 24.
+    // A desk count the teacher typed in themselves is only ever raised.
+    const size   = Math.max(1, state.groupSize);
+    const needed = Math.ceil(state.students.length / size) * size;
+    const untouched = state.deskCount === createInitialState().deskCount;
+    if (needed > 0 && (needed > state.deskCount || untouched)) {
+      state.deskCount = Math.min(MAX_DESK_COUNT, needed);
+      $('desk-count').value = state.deskCount;
+    }
+    // The grid is about to be replaced; the teacher desk is put back by the
+    // board afterwards instead of being left outside the new grid.
+    const hadTeacher = !!state.teacherDesk;
+    state.teacherDesk = null;
     const auto = computeAutoLayout(state.deskCount, state.groupSize);
     state.gridCols = Math.min(MAX_GRID, auto.gridCols);
     state.gridRows = Math.min(MAX_GRID, auto.gridRows);
     updateGridDisplay();
     rebuildDesks(false);
+    if (hadTeacher) placeTeacherDesk();
     state.hasRandomized = true;
   }
 
@@ -62,8 +70,8 @@ function handleRandomize() {
   // No count: the screen may be on the projector. Which rules broke is shown
   // in the (closed) rules panel.
   showToast(violations > 0
-    ? 'Randomisert — ikke alle regler kunne oppfylles'
-    : 'Pulter randomisert!');
+    ? 'Plassene er trukket — ikke alle regler kunne oppfylles'
+    : 'Plassene er trukket!');
 }
 
 // ── Rules ────────────────────────────────────────────────
@@ -106,23 +114,39 @@ function handleStudentInput(e) {
     const [oldName, newName] = [removed[0], added[0]];
     renameStudentRefs(oldName, newName);
     state.desks.forEach(d => {
-      if (d.studentName !== oldName) return;
-      d.studentName = newName;
-      const el = $('desk-el-' + d.id);
-      if (el) {
-        el.textContent    = newName;
-        el.style.fontSize = deskFontSize(newName, d);
-      }
+      if (d.studentName === oldName) d.studentName = newName;
     });
   }
 
   state.students = [...new Set(newNames)].slice(0, MAX_DESKS);
   updateStudentCount();
   updateDatalist();
+  // Re-drawn so desks of students who were just deleted show as «ikke i
+  // elevlisten» while the teacher is still typing.
+  renderClassroom();
   renderMismatchWarning();
   renderRuleList();
   renderGroupsAll();
   renderActivitiesAll();
+}
+
+/**
+ * Once the teacher is done editing the list (the textarea loses focus), anyone
+ * no longer on it leaves the chart, the groups and the teams. Not on every
+ * keystroke — deleting a name to retype it must not cost the student their seat.
+ */
+function settleStudentList() {
+  if (!hasRemovedStudents()) return;
+  pushUndo({ all: true });
+  const desks = dropRemovedStudents();
+  renderClassroom();
+  renderMismatchWarning();
+  renderRuleList();
+  renderGroupsAll();
+  renderActivitiesAll();
+  if (desks > 0) {
+    showToast(`${desks === 1 ? 'Én elev' : desks + ' elever'} som ikke lenger er i listen er tatt bort fra kartet (Angre: Ctrl+Z)`);
+  }
 }
 
 // ── Event wiring ─────────────────────────────────────────
@@ -138,13 +162,8 @@ function setupEventListeners() {
     });
   });
 
-  $('class-name').addEventListener('input', e => {
-    state.className = e.target.value;
-    $('classroom-title').textContent = state.className;
-    updatePrintHeader();
-  });
-
   $('students-textarea').addEventListener('input', handleStudentInput);
+  $('students-textarea').addEventListener('change', settleStudentList);
 
   $('desk-count').addEventListener('change', e => {
     state.deskCount = Math.max(1, Math.min(MAX_DESK_COUNT, +e.target.value || 1));
@@ -172,20 +191,9 @@ function setupEventListeners() {
 
   $('btn-teacher-desk').addEventListener('click', toggleTeacherDesk);
   $('btn-randomize').addEventListener('click', handleRandomize);
-  $('btn-undo').addEventListener('click', undo);
-  $('btn-new-class').addEventListener('click', newClass);
   $('btn-paste-students').addEventListener('click', pasteFromClipboard);
 
-  // Saved charts
-  $('btn-save').addEventListener('click', saveToLocalStorage);
-  $('btn-load').addEventListener('click', loadFromLocalStorage);
-  $('btn-delete').addEventListener('click', deleteFromLocalStorage);
   $('btn-clear-data').addEventListener('click', clearAllData);
-
-  // Student lists
-  $('btn-save-list').addEventListener('click', saveList);
-  $('btn-load-list').addEventListener('click', loadList);
-  $('btn-delete-list').addEventListener('click', deleteList);
 
   // Rules
   $('rules-info').addEventListener('click', e => {
@@ -208,9 +216,8 @@ function setupEventListeners() {
 
   // Print / export / import
   $('btn-print').addEventListener('click', () => window.print());
-  $('btn-export').addEventListener('click', exportJSON);
+  document.addEventListener('klassetavla:export', exportJSON);
   $('btn-export-png').addEventListener('click', exportPNG);
-  $('btn-import').addEventListener('click', () => $('import-file').click());
   $('import-file').addEventListener('change', e => {
     if (e.target.files.length > 0) {
       importJSON(e.target.files[0]);
@@ -264,23 +271,19 @@ function setupEventListeners() {
 
 // ── Init ─────────────────────────────────────────────────
 function initApp() {
-  restoreSession();
-  if (state.desks.length === 0) rebuildDesks(false);
+  // Loads the current class (bringing older saved data over the first time)
+  // and starts the autosave.
+  initClasses();
 
   setupEventListeners();
   initUI();
   initGroups();
   initActivities();
+  initBridges();
   initDragAndDrop();
   initBlackboardResize();
+  initPresentMode();
   renderAll();
-
-  // pagehide fires reliably on mobile and on tab close, where beforeunload is
-  // increasingly ignored.
-  window.addEventListener('pagehide', saveSession);
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') saveSession();
-  });
 }
 
 document.addEventListener('DOMContentLoaded', initApp);

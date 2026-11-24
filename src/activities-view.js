@@ -4,18 +4,18 @@ import {
   MIN_TEAM_SIZE, MAX_TEAM_SIZE, MAX_TEAMS, MAX_TEAM_NAME,
   MIN_CATEGORIES, MAX_CATEGORIES, MAX_CAT_LENGTH, MAX_ROUNDS,
   SECONDS_CHOICES, ROUNDS_ON_SHEET, CLASSIC_CATEGORIES
-} from './constants.js';
-import { state, pushUndo, detectDuplicates } from './state.js';
-import { todayKey, presentStudents, groupSizes, describeSizes, drawGroups, absentToday } from './groups.js';
+} from './constants.js?v=28';
+import { state, pushUndo, detectDuplicates } from './state.js?v=28';
+import { todayKey, presentStudents, groupSizes, describeSizes, drawGroups, absentToday } from './groups.js?v=28';
 import {
   drawLetter, drawCategories, rerollCategory, emptyMarks, emptyPenalties, roundPoints,
   nextMark, nextPenalty, standings, podium, buildTeams, teamsFromGroups, formatClock,
   roundSeconds, gameAsText, describeGame, letterPool
-} from './activities.js';
-import { showToast } from './toast.js';
-import { renderRuleList } from './rules-view.js';
-import { sfx, startMusic, stopMusic } from './game-audio.js';
-import { celebrate } from './celebrate.js';
+} from './activities.js?v=28';
+import { showToast } from './toast.js?v=28';
+import { renderRuleList } from './rules-view.js?v=28';
+import { sfx, startMusic, stopMusic } from './game-audio.js?v=28';
+import { celebrate } from './celebrate.js?v=28';
 
 // Everything on screen for the aktivitetene: the activity picker, the setup
 // for Mariusleken, and the fullscreen game itself.
@@ -273,7 +273,7 @@ function renderSetup() {
   if (m.teams.length === 0) {
     hint.textContent = present.length < 2
       ? 'Legg inn elevene i listen til venstre, så trekker du lag her.'
-      : `${plural(present.length, 'elev', 'elever')} → ${describeSizes(groupSizes(present.length, { sizeMode: 'size', size: m.teamSize }))}.`;
+      : `${plural(present.length, 'elev', 'elever')} → ${describeSizes(groupSizes(present.length, { sizeMode: 'size', size: m.teamSize }), ['lag', 'lag'])}.`;
   } else {
     const parts = [describeGame(m.teams, m.rounds)];
     if (away.length > 0) parts.push(`borte: ${away.join(', ')}`);

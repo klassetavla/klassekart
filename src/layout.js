@@ -1,9 +1,59 @@
 'use strict';
 
-import { CELL_SIZE, CELL_GAP, CELL_STRIDE } from './constants.js';
+import { CELL_SIZE, CELL_GAP, CELL_STRIDE, AISLE_SIZE } from './constants.js?v=28';
 
 // Pure geometry and layout maths. No state, no DOM — this is the part that is
 // worth testing in isolation.
+
+// ── Tracks ───────────────────────────────────────────────
+// Rows and columns are "tracks" of varying size: a full desk where there is a
+// desk, a narrow walkway where there is none. Everything that positions or
+// measures something on the grid goes through these, never through a fixed
+// stride — otherwise the controls, the board and the print size drift apart.
+
+/**
+ * Sizes and start offsets for `n` tracks (1-based). `used` holds the indices
+ * that contain a desk and get the full size; the rest get `aisle`.
+ */
+export function buildTracks(n, used, full = CELL_SIZE, aisle = AISLE_SIZE, gap = CELL_GAP) {
+  const start = [0];
+  const size  = [0];
+  let pos = 0;
+  for (let i = 1; i <= n; i++) {
+    const s = used.has(i) ? full : aisle;
+    start[i] = pos;
+    size[i]  = s;
+    pos += s + gap;
+  }
+  return { n, start, size, length: Math.max(0, pos - gap) };
+}
+
+/** Column and row tracks for a chart: which tracks hold a desk decides their size. */
+export function chartTracks(desks, teacherDesk, gridCols, gridRows) {
+  const cols = new Set();
+  const rows = new Set();
+  for (const d of desks) {
+    rows.add(d.row);
+    cols.add(d.col);
+    if (d.size === 2) cols.add(d.col + 1);
+  }
+  if (teacherDesk) {
+    cols.add(teacherDesk.col);
+    rows.add(teacherDesk.row);
+  }
+  return { cols: buildTracks(gridCols, cols), rows: buildTracks(gridRows, rows) };
+}
+
+/** Pixel span from the start of track `from` to the end of track `to`. */
+export function trackSpan(t, from, to = from) {
+  const a = Math.max(1, Math.min(t.n, from));
+  const b = Math.max(a, Math.min(t.n, to));
+  return t.start[b] + t.size[b] - t.start[a];
+}
+
+// ── Uniform-grid helpers ─────────────────────────────────
+// What the grid looks like with every track at full size. Kept for code that
+// has no tracks to hand; the chart itself is drawn with the tracks above.
 
 export function cellToPos(col, row) {
   return { left: (col - 1) * CELL_STRIDE, top: (row - 1) * CELL_STRIDE };
@@ -50,10 +100,11 @@ export function computeAutoLayout(deskCount, groupSize) {
   const gpr         = Math.max(2, Math.min(6, Math.round(Math.sqrt(totalGroups))));
   const gridCols    = groupSize <= 1 ? gpr : gpr * (groupSize + 1) - 1;
   const groupRows   = Math.ceil(totalGroups / gpr);
-  // Each desk row occupies 1 row and the gap after it another → ×2
+  // Each desk row is followed by a walkway, except the last one — a trailing
+  // walkway is just an empty row at the back of the room.
   return {
     gridCols: Math.max(2, gridCols),
-    gridRows: Math.max(3, groupRows * 2)
+    gridRows: Math.max(1, groupRows * 2 - 1)
   };
 }
 
